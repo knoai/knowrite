@@ -12,6 +12,7 @@ const { getWorldContextForPrompt } = require('./world-context');
 const { evaluateChapterFitness, saveFitness } = require('./fitness-evaluator');
 const { buildRagContext, indexChapterSummary } = require('./rag-retriever');
 const truthManager = require('./truth-manager');
+const outputGovernance = require('./output-governance');
 
 const engineCfg = require('../../config/engine.json');
 const SUMMARY_WINDOW_SIZE = engineCfg.context.summaryWindowSize;
@@ -703,7 +704,16 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   }
 
   // Fitness 评估
-  await runFitnessEvaluation(workId, nextNumber, finalResult.chars);
+  const fitnessResult = await runFitnessEvaluation(workId, nextNumber, finalResult.chars);
+
+  // 输出治理：入队
+  try {
+    await outputGovernance.enqueueChapter(workId, nextNumber, {
+      fitnessScore: fitnessResult?.score,
+    });
+  } catch (err) {
+    console.error('[novel-engine] 输出治理入队失败:', err.message);
+  }
 
   return {
     rawFile: `chapter_${nextNumber}_raw.txt`,
@@ -819,7 +829,16 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
   }
 
   // Fitness 评估
-  await runFitnessEvaluation(workId, nextNumber, polishResult.chars);
+  const fitnessResult = await runFitnessEvaluation(workId, nextNumber, polishResult.chars);
+
+  // 输出治理：入队
+  try {
+    await outputGovernance.enqueueChapter(workId, nextNumber, {
+      fitnessScore: fitnessResult?.score,
+    });
+  } catch (err) {
+    console.error('[novel-engine] 输出治理入队失败:', err.message);
+  }
 
   return {
     rawFile: `chapter_${nextNumber}.txt`,

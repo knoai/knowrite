@@ -11,6 +11,8 @@ const novelRouter = require('./routes/novel');
 const worldContextRouter = require('./routes/world-context');
 const { router: templatesRouter, seedDefaultTemplates } = require('./routes/templates');
 const temporalTruthRouter = require('./routes/temporal-truth');
+const authorFingerprintRouter = require('./routes/author-fingerprint');
+const outputGovernanceRouter = require('./routes/output-governance');
 const { getSettings } = require('./services/settings-store');
 const { requireAuth } = require('./middleware/auth');
 const { runStreamChat } = require('./core/chat');
@@ -103,6 +105,8 @@ app.use('/api/novel', novelRouter);
 app.use('/api/novel/works/:workId', worldContextRouter);
 app.use('/api/novel/story-templates', templatesRouter);
 app.use('/api/truth', temporalTruthRouter);
+app.use('/api/style', authorFingerprintRouter);
+app.use('/api/output', outputGovernanceRouter);
 
 // 健康检查
 app.get('/health', async (req, res) => {

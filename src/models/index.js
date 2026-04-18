@@ -443,6 +443,91 @@ const TruthResource = sequelize.define('TruthResource', {
 
 Work.hasMany(TruthResource, { foreignKey: 'workId', sourceKey: 'workId', as: 'truthResources' });
 
+// ==================== Phase 2: 全维度作者指纹 ====================
+
+const AuthorFingerprint = sequelize.define('AuthorFingerprint', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  narrativeLayer: { type: DataTypes.JSON, allowNull: true },
+  characterLayer: { type: DataTypes.JSON, allowNull: true },
+  plotLayer: { type: DataTypes.JSON, allowNull: true },
+  languageLayer: { type: DataTypes.JSON, allowNull: true },
+  worldLayer: { type: DataTypes.JSON, allowNull: true },
+  sampleParagraphs: { type: DataTypes.JSON, defaultValue: [] },
+  styleGuide: { type: DataTypes.TEXT, allowNull: true },
+}, {
+  tableName: 'author_fingerprints',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [{ fields: ['name'] }],
+});
+
+const WorkStyleLink = sequelize.define('WorkStyleLink', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  fingerprintId: { type: DataTypes.INTEGER, allowNull: false },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  priority: { type: DataTypes.INTEGER, defaultValue: 1 },
+}, {
+  tableName: 'work_style_links',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'fingerprintId'], unique: true },
+    { fields: ['workId'] },
+  ],
+});
+
+Work.hasMany(WorkStyleLink, { foreignKey: 'workId', sourceKey: 'workId', as: 'styleLinks' });
+
+// ==================== Phase 3: 输出治理 ====================
+
+const OutputQueue = sequelize.define('OutputQueue', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  chapterNumber: { type: DataTypes.INTEGER, allowNull: false },
+  enqueuedAt: { type: DataTypes.DATE, allowNull: false },
+  priority: { type: DataTypes.INTEGER, defaultValue: 5 },
+  fitnessScore: { type: DataTypes.FLOAT, allowNull: true },
+  status: { type: DataTypes.STRING, defaultValue: 'pending' },
+  // pending / l1_validating / l1_failed / l2_validating / l2_failed / human_reviewing / human_rejected / released
+  l1Result: { type: DataTypes.JSON, allowNull: true },
+  l2Result: { type: DataTypes.JSON, allowNull: true },
+  humanReview: { type: DataTypes.JSON, allowNull: true },
+  releasedAt: { type: DataTypes.DATE, allowNull: true },
+  releasedBy: { type: DataTypes.STRING, allowNull: true },
+}, {
+  tableName: 'output_queue',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'chapterNumber'], unique: true },
+    { fields: ['status'] },
+    { fields: ['priority', 'enqueuedAt'] },
+  ],
+});
+
+const OutputValidationRule = sequelize.define('OutputValidationRule', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  level: { type: DataTypes.STRING, allowNull: false },
+  category: { type: DataTypes.STRING, allowNull: false },
+  condition: { type: DataTypes.JSON, allowNull: false },
+  action: { type: DataTypes.STRING, defaultValue: 'block' },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  description: { type: DataTypes.TEXT, allowNull: true },
+}, {
+  tableName: 'output_validation_rules',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [{ fields: ['level', 'isActive'] }],
+});
+
 let initialized = false;
 async function initDb() {
   if (initialized) return;
@@ -472,4 +557,8 @@ module.exports = {
   TruthState,
   TruthHook,
   TruthResource,
+  AuthorFingerprint,
+  WorkStyleLink,
+  OutputQueue,
+  OutputValidationRule,
 };
