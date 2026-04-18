@@ -504,14 +504,21 @@ knowrite/
 │   │   ├── output-governance.js  # 输出治理 API
 │   │   └── input-governance.js   # 输入治理 API
 │   ├── services/
-│   │   ├── novel-engine.js       # 核心创作引擎（knowrite / pipeline 双策略）
+│   │   ├── novel-engine.js       # 核心创作引擎（knowrite / pipeline 双策略）— 537 行，已从 1,357 行拆分
+│   │   ├── novel/                # novel-engine.js 拆分出的子模块
+│   │   │   ├── chapter-writer.js     # 7-Agent / Pipeline 写作管道
+│   │   │   ├── chapter-processor.js  # 摘要/反馈/Fitness/Truth-Delta 后处理
+│   │   │   ├── context-builder.js    # 滚动上下文 + RAG + 反重复
+│   │   │   ├── outline-generator.js  # 大纲生成（主题/详细/多卷/分卷）
+│   │   │   ├── edit-reviewer.js      # 编辑审阅 +  verdict 解析
+│   │   │   └── novel-utils.js        # 纯工具函数（expandStyle/wordVars/promptName）
 │   │   ├── fitness-evaluator.js  # 5 维 Fitness 评估
-│   │   ├── vector-store.js       # 向量存储（embedding + SQLite + 余弦相似度）
+│   │   ├── vector-store.js       # 向量存储（HNSW + SQLite + JS 余弦相似度回退）
 │   │   ├── rag-retriever.js      # RAG 检索（章节/角色/设定相关性检索）
 │   │   ├── memory-index.js       # 智能检索索引 + 反重复提醒 + 重复检测
 │   │   ├── prompt-evolver.js     # 基于 Fitness 数据的 Prompt 自动进化
 │   │   ├── prompt-loader.js      # Prompt 模板系统（i18n 预留 + 变量替换）
-│   │   ├── settings-store.js     # DB 配置 + 加密存储 + 种子数据
+│   │   ├── settings-store.js     # DB 配置 + AES-256-GCM 加密存储 + 种子数据
 │   │   ├── world-context.js      # 世界观记忆库注入
 │   │   ├── file-store.js         # 文件持久化（本地备份）
 │   │   ├── temporal-truth.js     # 事件溯源 + 时间旅行查询
