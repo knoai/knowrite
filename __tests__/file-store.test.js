@@ -174,4 +174,19 @@ describe('file-store', () => {
     expect(second).toBe('new'); // TTL expired, read from DB
     global.Date.now = realNow;
   });
+
+  test('LRU eviction removes oldest cached entry when cache is full', async () => {
+    // Write enough unique files to exceed CACHE_MAX_SIZE
+    const files = [];
+    for (let i = 0; i < 202; i++) {
+      const fname = `lru_${i}.txt`;
+      files.push(fname);
+      await fileStore.writeFile(workId, fname, `content ${i}`);
+    }
+
+    // Read the first file again — it should have been evicted from cache
+    // and re-read from DB
+    const content = await fileStore.readFile(workId, files[0]);
+    expect(content).toBe('content 0');
+  });
 });
