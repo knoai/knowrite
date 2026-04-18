@@ -1,0 +1,302 @@
+const fs = require('fs');
+const path = require('path');
+const { initDb, Setting } = require('../models');
+
+const CONFIG_DIR = path.join(__dirname, '../../config');
+const SETTINGS_FILE = path.join(CONFIG_DIR, 'user-settings.json');
+const SETTINGS_KEY = 'user-settings';
+
+const seedSettings = {
+  authorStyles: [
+    { name: '热血磅礴', description: '【玄幻】热血玄幻、霸气磅礴。世界观宏大、悬念重重、伏笔深远。人物名号响亮霸气，打斗场面要有"举世皆惊"、"震动天下"的宏大感，主角台词不屈霸气，同级无敌、逆天而行。' },
+    { name: '少年逆袭', description: '【玄幻】退婚流/逆袭流鼻祖。少年热血、不屈不挠，修炼体系清晰，战斗节奏明快，爽点密集，情绪高昂。' },
+    { name: '体系严谨', description: '【玄幻】设定严谨、战斗体系清晰、情感专一。擅长构建完整的世界规则与职业体系，主角坚韧正直，长线情感稳定。' },
+    { name: '稳健策略', description: '【玄幻】番茄流代表。修炼体系自洽，节奏稳扎稳打，主角性格沉稳低调，重视家人与兄弟情，战斗讲究策略。' },
+    { name: '深情宿命', description: '【仙侠】深情仙侠、宿命哲思。擅长写"我命如妖欲封天"的逆天感，文风深情而悲壮，人物执念深重，情节中常有宿命般的无奈与不屈，意境悠远，带有强烈的诗意和哲思。' },
+    { name: '凡人', description: '【仙侠】凡人流、谨慎务实。主角出身平凡，靠谨慎、毅力和算计一步步崛起。文风沉稳务实，升级体系严谨，战斗讲究策略与底牌，弱小时隐忍，强大后一击必杀。' },
+    { name: '唯美情殇', description: '【仙侠】诛仙式唯美玄幻。仙侠情缘与正魔对立交织，文笔优美抒情，重视情感悲剧与人物内心刻画，意境凄美。' },
+    { name: '古典正统', description: '【仙侠】古典仙侠正统。文化底蕴深厚，重视诗词意境与传统道家文化，画面唯美，情感含蓄。' },
+    { name: '门派情义', description: '【仙侠】正统仙侠。重视师徒情与门派归属感，文风稳健，战斗与情感并重。' },
+    { name: '脑洞仙侠', description: '【仙侠】开创性仙侠。脑洞大开，设定新颖，文风轻松幽默，善于打破传统仙侠套路。' },
+    { name: '团战热血', description: '【仙侠】热血团战型仙侠。重视兄弟情义与宗门争霸，战斗场面宏大，节奏明快，热血高燃。' },
+    { name: '设定控', description: '【仙侠】设定严谨仙侠。世界观构建极其细致，修行体系有完整理论支撑，文风偏冷静理性。' },
+    { name: '家族修仙', description: '【仙侠】以家族/宗门整体兴衰为核心，主角不仅是个人崛起，更要带领族人共享资源、共御外敌。重视血脉传承、灵地争夺、家族长老议事、后辈培养，强调"一人得道，鸡犬升天"的集体爽感与香火延续的使命感。' },
+    { name: '程序员修仙', description: '【仙侠】用程序员的逻辑解构修仙世界。将功法视为代码、经脉视为架构、丹药视为性能优化，重视系统化思维与BUG修复式破局。文风理性中透着冷幽默，擅长用工程化语言描述玄学概念，爽点在于用理工科思维降维打击传统修仙者。' },
+    { name: '现代农民修仙', description: '【仙侠/种田】以乡土田园为根基的现代修仙。主角通过灵泉、灵植、灵田改良农作物，带动全村致富。重视乡村人情、邻里关系、田园牧歌式生活，种田与修炼并重，爽点在于朴实的丰收喜悦与低调的乡土装逼。' },
+    { name: '都市修仙', description: '【都市/仙侠】主角在现代都市中修炼，身怀仙法融入繁华都市。重视扮猪吃虎、医术/武道/风水在现代社会的降维应用，以及都市人情世故与修仙者超然心态的碰撞。爽点在于低调高手随手化解都市精英的困境。' },
+    { name: '系统', description: '【泛题材】以系统面板为核心金手指。任务驱动剧情，数据化成长，完成目标即可获得奖励。重视明确的升级路径、即时反馈与确定性爽感，节奏极快，反转与打脸频繁。' },
+    { name: '后宫轻松', description: '【都市】都市后宫/校园保镖流。轻松搞笑，女主众多，情节轻松愉快，适合青少年读者。' },
+    { name: '暧昧温情', description: '【都市】都市情感/医生文。文笔幽默，人物鲜活，擅长写暧昧与温情并存的都市恋情。' },
+    { name: '灰色江湖', description: '【都市】都市黑道/异能。人物立体，剧情跌宕，擅长写灰色地带的人性与江湖义气。' },
+    { name: '商战推演', description: '【都市】重生商战/官场。格局宏大，经济推演严谨，重视时代背景与商业逻辑。' },
+    { name: '青春怀旧', description: '【都市】青春都市/重生怀旧。文笔细腻，重视青春遗憾与时代记忆，情感真挚动人。' },
+    { name: '文娱逆袭', description: '【都市】文娱文代表。爽点密集，主角在娱乐圈/文坛一路逆袭，打脸情节设计精巧。' },
+    { name: '渣男重生', description: '【都市】重生都市/渣男流。人物真实接地气，对话鲜活，擅长写青春校园与人际关系。' },
+    { name: '鉴宝悬疑', description: '【都市】鉴宝/风水都市。专业知识丰富，悬疑与都市结合，重视传统文化与江湖规矩。' },
+    { name: '现实热血', description: '【都市】现实主义都市。热血正义，重视社会现实与底层人物，文笔硬朗，情感浓烈。' },
+    { name: '星河硬科幻', description: '【科幻】硬科幻/宏大叙事。重视科学原理与哲学思辨，场面恢弘，常探讨文明存亡与人性抉择。' },
+    { name: '伦理哲思', description: '【科幻】哲理科幻。关注科技伦理与人类命运，情节紧凑，思想深刻，带有浓厚的人文关怀。' },
+    { name: '柔情科幻', description: '【科幻】软科幻/情感细腻。科学与人文并重，重视亲情与爱情在宏大背景下的脆弱与坚韧。' },
+    { name: '荒诞暗黑', description: '【科幻】暗黑科幻/荒诞隐喻。文风压抑诡异，擅长用科幻外壳包裹对社会现实的深刻批判。' },
+    { name: '融合设定', description: '【科幻】废土/赛博科幻。设定严谨，世界观融合度高，情节环环相扣，重视团队与探索。' },
+    { name: '种田吐槽', description: '【科幻】科幻种田/吐槽欢乐。宏大宇宙背景下的轻松叙事，玩梗密集，重视文明发展与人性温暖。' },
+    { name: '硬核电影', description: '【科幻】硬核科幻/电影感。科学细节考究，节奏紧凑，场景极具画面感，适合影视改编。' },
+    { name: '温馨治愈', description: '【科幻】科幻温馨。设定新颖但笔触温柔，重视日常生活与情感羁绊，文风治愈。' },
+    { name: '机甲热血', description: '【科幻】机甲科幻/热血搞笑。战斗场面精彩，主角成长线清晰，热血与幽默并存。' },
+    { name: '机械策略', description: '【科幻】机甲流鼻祖。机械设定详细，战斗策略丰富，重视主角从弱到强的技术成长。' },
+    { name: '民俗探险', description: '【悬疑】探险悬疑/民俗丰富。重视民间传说与地理风俗，场景真实可感，悬念层层递进。' },
+    { name: '盗墓解密', description: '【悬疑】盗墓悬疑/烧脑。挖坑与解谜并行，重视兄弟情义与家族秘密，氛围紧张诡异。' },
+    { name: '都市心理惊悚', description: '【悬疑】心理悬疑/都市恐怖。重视心理刻画与反转，氛围阴郁，擅长写人性阴暗面。' },
+    { name: '法医刑侦纪实', description: '【悬疑】法医刑侦/专业硬核。真实案件改编，法医知识丰富，推理过程严谨，纪实感强。' },
+    { name: '犯罪心理', description: '【悬疑】犯罪心理/黑暗写实。重视罪犯心理画像与社会背景，文风沉重，人物命运感强烈。' },
+    { name: '社会推理', description: '【悬疑】社会派推理。推理严密，反转惊人，重视社会现实与制度批判，结局常令人唏嘘。' },
+    { name: '副本恐怖', description: '【悬疑】恐怖悬疑/副本精彩。以恐怖屋/冒险乐园为舞台，副本设计精巧，恐怖与温情并存。' },
+    { name: '黑色灵学', description: '【悬疑】灵异悬疑/黑色幽默。地府、鬼神元素丰富，文风幽默中带着阴森，反套路频出。' },
+    { name: '民俗阴阳', description: '【悬疑】民俗灵异/接地气。以阴阳先生视角展开，重视东北民俗与道教文化，语言生活化。' },
+    { name: '民族神秘', description: '【悬疑】民族神秘学/探险悬疑。以苗疆蛊术为特色，民族风情浓厚，探险与解密结合。' },
+    { name: '穿越言情', description: '【历史】历史穿越/细腻言情。文笔优美，重视历史细节与宫廷政治，情感线缠绵悱恻。' },
+    { name: '家国悲壮', description: '【历史】历史厚重/悲剧美学。重视家国情怀与乱世苍生，文风苍凉悲壮，人物命运感强烈。' },
+    { name: '温情历史', description: '【历史】轻松历史/温情日常。以唐朝为背景，重视家庭温情与历史人物的再塑造，文风幽默。' },
+    { name: '权谋温润', description: '【历史】权谋历史。布局深远，权斗争夺精彩纷呈，主角智谋过人，文风温润而有力。' },
+    { name: '幽默历史', description: '【历史】幽默历史科普。以现代语言解读历史，幽默风趣，重视历史事件的人性化解读。' },
+    { name: '谋士战略', description: '【历史】谋士流/权谋精彩。主角以智谋立足乱世，重视战略推演与朝堂博弈。' },
+    { name: '军事推演', description: '【历史】硬核历史/军事推演。重视军事细节与历史推演，文风冷峻，战争场面真实残酷。' },
+    { name: '民族热血', description: '【历史】热血历史/民族情怀。以南宋抗金为背景，战斗场面激昂，民族情感浓烈。' },
+    { name: '变革思辨', description: '【历史】架空历史/思想深度。重视社会制度变革与思想启蒙，布局宏大，人物众多。' },
+    { name: '制度严谨', description: '【历史】严谨历史/制度改革。以北宋为背景，重视政治经济改革的逻辑推演，文风沉稳。' },
+    { name: '甜宠轻松', description: '【言情】甜宠治愈。文笔温暖轻松，人物可爱，情感发展自然，结局圆满，适合放松心情。' },
+    { name: '虐恋古典', description: '【言情】虐恋情深/文笔华美。情感浓烈而绝望，重视古典意境与悲剧美学，催泪效果极佳。' },
+    { name: '古装虐恋', description: '【言情】穿越言情/历史厚重。以历史为背景，情感与权谋交织，人物命运波澜壮阔。' },
+    { name: '酸涩青春', description: '【言情】现实言情/酸涩成长。重视青春遗憾与现实无奈，文风细腻，情感真挚。' },
+    { name: '悬爱甜文', description: '【言情】悬爱言情/智商在线。将悬疑与爱情结合，推理严谨，感情线甜而不腻。' },
+    { name: '耽美群像', description: '【言情】耽美言情/群像精彩。人物塑造饱满，情感浓烈，世界观完整，重视道义与情义的冲突。' },
+    { name: '强强剧情', description: '【言情】强强联合/文笔老练。感情线与剧情线并重，人物独立强大，对话机锋，思想深刻。' },
+    { name: '现实治愈', description: '【言情】现实向/救赎感。重视底层人物的生活细节，对话鲜活，情感温暖而真实，治愈人心。' },
+    { name: '温柔浪漫', description: '【言情】温柔浪漫/设定新颖。文风温柔，情感细腻，擅长构建独特的世界观与浪漫氛围。' },
+    { name: '克制遗憾', description: '【言情】现实言情/人物坚韧。重视人物内心成长，情感克制而深沉，结局常有遗憾美。' },
+    { name: '电竞群像', description: '【轻小说】电竞文/群像搞笑。人物众多但各具特色，对话幽默，重视团队协作与热血竞技。' },
+    { name: '烧脑吐槽', description: '【轻小说】吐槽玩梗/烧脑副本。主角高智商毒舌，副本设计精巧，文风幽默中带着黑暗。' },
+    { name: '毒舌灵气', description: '【轻小说】毒舌吐槽/灵气复苏。主角嘴贱但心怀正义，节奏快，情绪转折强烈，适合年轻读者。' },
+    { name: '轻松甜文', description: '【轻小说】轻松搞笑/后宫甜宠。文风幽默，情节轻松愉快，女主形象鲜明，适合休闲阅读。' },
+    { name: '无限战斗', description: '【轻小说】无限流/战斗热血。副本设计多样，战斗场面精彩，主角成长线清晰。' },
+    { name: '科幻修真', description: '【轻小说】科幻修真/热血中二。将科幻与修真融合，世界观宏大，热血与理想主义并存。' },
+    { name: '种田吐槽', description: '【轻小说】吐槽欢乐/科幻奇幻。宏大背景下的人文关怀，玩梗密集，重视文明与个体的关系。' },
+    { name: '日常吐槽', description: '【轻小说】日常吐槽/无敌流。以日常生活与吐槽为主，节奏轻松，适合碎片化阅读。' },
+    { name: '脑洞搞笑', description: '【轻小说】搞笑日常/脑洞大开。以修真聊天群为代表，打破第四面墙，玩梗无下限。' },
+    { name: '苟道稳健', description: '【轻小说】苟道流/轻松搞笑。主角极度稳健，反差萌强烈，文风幽默，适合解压阅读。' },
+    { name: '80后', description: '【怀旧】热血理想与时代变迁交织。重视家国情怀、集体荣誉与奋斗精神，文风厚重，情感深沉，常带有理想主义色彩和时代记忆。' },
+    { name: '90后', description: '【都市】个体觉醒与多元价值并存。重视自我表达、职场奋斗与情感独立，文风务实中带有个性张扬，善于捕捉社会热点与亚文化梗。' },
+    { name: '00后', description: '【青少年】极致快节奏与碎片化爽感。人设标签鲜明，玩梗密集，情绪直给，重视即时反馈与社交媒体传播性，三章一小爽，五章一大爽。' },
+    { name: '10后', description: '【青少年】热血中二、玩梗爽点。面向10-15岁读者，节奏极快，三章一小爽、五章一大爽。人设标签鲜明（系统/签到/无敌流），热血中二、允许玩梗、对话活泼幽默，每章至少一个打脸/震惊全场的爽点。' },
+  ],
+  platformStyles: [
+    { name: '番茄', description: '节奏极快，开篇3章内必须出现强爽点或强反转，句子短小，段落破碎，信息密度高，每300字一个小刺激，情绪直白浓烈，适配滑动阅读。' },
+    { name: '起点', description: '允许稍长铺垫，重视世界观构建和伏笔深远，节奏张弛有度，文笔可更厚重，人物刻画更立体，支持长篇连载（百万字以上），注重IP改编潜力。' },
+    { name: '晋江', description: '情感细腻，人物刻画立体，文笔优美；重视人物关系张力与情感递进，情节服务于人物成长与情感变化。' },
+    { name: '七猫', description: '以甜宠或虐恋为主轴，情绪浓烈，章末钩子强；重视读者情绪共鸣，泪点/爽点密集，适合女性向快节奏消费。' },
+    { name: '飞卢', description: '脑洞大开，标题党气质，快节奏爽文；同人改编、系统流、签到流盛行；三章一小爽，五章一大爽，信息轰炸。' },
+    { name: '纵横', description: '玄幻仙侠大本营，文风厚重，升级体系严谨；重视战斗描写与境界突破的仪式感，热血与霸气并重。' },
+    { name: '掌阅', description: '出版向品质，结构严谨，逻辑自洽；适合影视/有声改编，重视对白质量与场景画面感，节奏稳健。' },
+    { name: '知乎', description: '短篇精悍，第一人称叙事，强反转；贴近现实，注重代入感与情绪冲击，适合中短篇或单元剧结构。' },
+    { name: '豆瓣阅读', description: '现实主义基调，文艺气息浓厚，心理描写深入；重视社会观察与人性探讨，文笔克制而有力量。' },
+    { name: '刺猬猫/菠萝包', description: '二次元浓度高，玩梗密集，轻小说句式；重视人设标签、吐槽文化与 ACG 梗，宅向元素丰富。' },
+  ],
+  reviewDimensions: [
+    // 一、开篇与结构（5维）
+    { name: '黄金三章', description: '前3章是否完成主角亮相、核心冲突、世界观锚定与阅读契约建立？' },
+    { name: '开篇钩子', description: '开头200字内是否有冲突/悬念/反常事件，能迅速抓住读者？' },
+    { name: '章末钩子', description: '每章结尾是否留下强钩子（未解悬念、对决预告、意味深长的台词）？' },
+    { name: '期待感', description: '信息差是否清晰？铺垫是否充足？读者是否有强烈的"下一章会发生什么"的迫切感？' },
+    { name: '结构完整性', description: '本章在整体叙事中功能是否明确（铺垫/高潮/过渡/转折）？起承转合是否完整？' },
+    // 二、人物塑造（6维）
+    { name: '主角动机', description: '主角的目标是否清晰、紧迫，且与读者价值观可共鸣？' },
+    { name: '主角缺陷', description: '主角是否有明显缺陷，且该缺陷真实影响本章情节走向，而非装饰性标签？' },
+    { name: '主角成长弧光', description: '本章是否有认知、能力或心境的微小推进，体现人物成长？' },
+    { name: '反派塑造', description: '反派是否有独立动机与压迫感？是否过于脸谱化或智商掉线？' },
+    { name: '配角记忆点', description: '重要配角是否有独特标签、台词风格或存在价值，避免沦为工具人？' },
+    { name: '人设一致性', description: '人物言行是否符合既定性格、能力与背景？有无OOC（Out Of Character）？' },
+    // 三、情节与叙事（7维）
+    { name: '主线清晰度', description: '本章事件是否明确服务于核心主线？有无偏离主题的无效内容？' },
+    { name: '爽点设计', description: '本章是否有清晰的情绪高潮或爽点（打脸、反转、收获、震惊全场）？铺垫是否到位？' },
+    { name: '反转意外性', description: '情节转折是否在情理之中、意料之外？有无为了反转而反转的生硬感？' },
+    { name: '悬念铺设', description: '是否有未解谜团或信息差？信息释放的节奏是否得当，既不过度保密也不过早泄露？' },
+    { name: '伏笔回收', description: '既有伏笔是否在本章被推进或回收？新伏笔是否自然植入而不显刻意？' },
+    { name: '冲突密度', description: '本章内外部冲突（人与人、人与环境、人与自我）是否充足且有层次？' },
+    { name: '情节推进效率', description: '是否删减了无关支线、重复回忆与无效过渡？每一段落是否都在推动故事？' },
+    // 四、情绪与节奏（5维）
+    { name: '情绪传递', description: '情绪是否通过细节、动作、微表情传递？有无直接陈述情绪（"他很难过/很生气"）或强行煽情？' },
+    { name: '情绪曲线', description: '本章情绪是否有起伏（压抑→释放、紧张→松弛）？是否 monotone 平淡如水？' },
+    { name: '节奏张弛', description: '高潮戏与过渡戏的分配是否合理？高潮短促有力，过渡不拖沓、不跳戏。' },
+    { name: '信息密度', description: '每页是否有足够的新信息（剧情推进、设定揭示、人物关系变化）？有无大量信息真空？' },
+    { name: '水文控制', description: '是否存在无意义心理独白、重复回忆、场景空转或过度环境描写？' },
+    // 五、文笔与语言（5维）
+    { name: '画面感', description: '场景描写是否具象？是否调动至少两种感官（视觉+听觉/触觉/嗅觉）？有无抽象空洞？' },
+    { name: '对话质量', description: '台词是否符合人物身份与性格？每句对话是否承担推进剧情、塑造人物或揭示信息的功能？' },
+    { name: '语言风格适配', description: '是否符合"{{style}}"的调性？句式是否长短错落，贴合平台与作者风格？' },
+    { name: '修辞水准', description: '有无精妙比喻或独特表达？是否出现AI腔、辞藻堆砌、连续排比或陈词滥调？' },
+    { name: '错别字与语病', description: '基础文字质量是否过关？有无明显错别字、病句、标点误用或语序混乱？' },
+    // 六、世界观与设定（3维）
+    { name: '设定新颖度', description: '世界观、金手指、力量体系是否有创新点或反套路设计？是否让读者眼前一亮？' },
+    { name: '设定一致性', description: '新引入的设定是否与已有体系冲突？内在逻辑是否自洽、规则是否稳定？' },
+    { name: '设定展示方式', description: '设定是否通过剧情冲突、人物反应或对话自然带出？有无大段说明书式 dump？' },
+    // 七、商业价值与市场适配（2维）
+    { name: '平台调性匹配', description: '节奏、句式、情绪表达方式是否契合目标平台（番茄/起点/晋江等）的用户阅读习惯？' },
+    { name: '品类辨识度', description: '是否具备明确的品类标签（系统流/种田流/凡人流/退婚流），让目标读者一眼识别并产生阅读预期？' },
+  ],
+  skill: `1. 开篇钩子：开头200字内必须有冲突/悬念/反常事件，黄金三章内完成主角亮相、核心冲突与世界观锚定。
+2. 章末钩子：每章结尾必须留下强钩子（未解悬念、即将到来的对决、意味深长的台词），让读者产生强烈追读欲望。
+3. 悬念与期待感：利用信息差制造张力，悬念揭晓前必须有2-3处铺垫，禁止毫无征兆的反转；每章都要让读者迫切想知道"下一章会发生什么"。
+4. 爽点设计：每章至少要有1个情绪高潮或爽点（打脸、反转、收获、震惊全场），必须在情理之中、意料之外，铺垫到位。
+5. 反转意外性：情节转折要意料之外、情理之中，禁止为了反转而反转的生硬处理。
+6. 伏笔管理：既有伏笔要在合适时机推进或回收，新伏笔要自然植入，不显刻意。
+7. 主角动机：目标必须清晰、紧迫，与读者价值观可共鸣；主角的每个重大行动都要服务于该动机。
+8. 人物缺陷：主角或核心配角必须有明显缺陷，且该缺陷真实影响本章情节走向，不能是装饰性设定。
+9. 人设一致性：人物言行必须符合既定性格、能力与背景，严禁OOC。
+10. 反派塑造：反派要有独立动机与合理智商，制造真实压迫感，避免脸谱化和降智光环。
+11. 配角记忆点：重要配角要有独特标签、台词风格或存在价值，禁止纯工具人。
+12. 视觉冲击：所有重要场景必须通过至少两种感官描写（视觉+听觉/触觉/嗅觉），禁用"很/非常/仿佛"等模糊词泛滥。
+13. 画面感：场景描写必须具象可感，禁止抽象空洞的概述。
+14. 情感冲击：情绪必须藏在细节里，禁止直接陈述"他很难过/很生气"，要用动作、微表情和环境反应传递情绪。
+15. 代入感：主角必须有软肋（怕黑、怕高、怕辜负某人），困境要通过私人情感落地，让读者能与主角同步呼吸。
+16. 情绪曲线：本章情绪必须有起伏（压抑→释放、紧张→松弛），禁止 monotone 平淡如水。
+17. 节奏：高潮戏短段落快节奏，过渡戏也必须埋设伏笔或推进人物关系，禁止平铺直叙和水文。
+18. 情节推进效率：删减无关支线、重复回忆与无效过渡，每一段落都要在推动故事。
+19. 信息密度：每页都要有新的剧情推进、设定揭示或人物关系变化，禁止信息真空。
+20. 主线清晰度：本章事件必须明确服务于核心主线，偏离主题的无效内容要坚决删除。
+21. 冲突密度：内外部冲突（人与人、人与环境、人与自我）必须充足且有层次。
+22. 对话：对话必须符合人物身份与性格，口语化自然；每句台词都要承担推进剧情、塑造人物或揭示信息的功能，禁止无意义寒暄和解释性独白。
+23. 语言风格：句式长短错落，贴合所选平台与作者风格（{{style}}）的调性，禁用连续排比和AI通用套话（"不仅如此"/"不可否认的是"/"然而"开头）。
+24. 修辞水准：追求精妙比喻和独特表达，杜绝AI腔、辞藻堆砌与陈词滥调。
+25. 设定一致性：新引入的设定必须与已有世界观兼容，内在逻辑自洽、规则稳定。
+26. 设定展示方式：设定要融入剧情（通过人物反应、冲突、对话带出），禁止大段说明书式 dump。
+27. 设定新颖度：世界观、金手指、力量体系要有创新点或反套路，让读者眼前一亮。
+28. 平台调性匹配：节奏、句式、情绪表达方式必须契合目标平台（番茄/起点/晋江等）的用户阅读习惯。
+29. 品类辨识度：要有明确的品类标签（系统流/种田流/凡人流/退婚流），让目标读者一眼识别并产生阅读预期。
+30. 基础文字质量：杜绝错别字、病句、标点误用与语序混乱。`,
+};
+
+const minimalDefaults = {
+  authorStyles: [],
+  platformStyles: [],
+  reviewDimensions: [],
+  skill: seedSettings.skill,
+};
+
+async function initSettings() {
+  await initDb();
+  const existing = await Setting.findByPk(SETTINGS_KEY);
+  if (existing) return; // 已初始化过，完全以数据库为准
+
+  let merged = { ...seedSettings };
+  if (fs.existsSync(SETTINGS_FILE)) {
+    try {
+      const fileData = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+      merged = { ...seedSettings, ...fileData };
+    } catch {}
+  }
+
+  await Setting.create({
+    key: SETTINGS_KEY,
+    value: JSON.stringify(merged),
+  });
+
+  // 同步备份本地文件
+  if (!fs.existsSync(CONFIG_DIR)) {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  }
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf-8');
+}
+
+async function getSettings() {
+  await initSettings();
+  const row = await Setting.findByPk(SETTINGS_KEY);
+  if (!row) return { ...minimalDefaults };
+  try {
+    const data = JSON.parse(row.value);
+    return { ...minimalDefaults, ...data };
+  } catch {
+    return { ...minimalDefaults };
+  }
+}
+
+async function saveSettings(settings) {
+  await initSettings();
+  await Setting.upsert({
+    key: SETTINGS_KEY,
+    value: JSON.stringify(settings),
+  });
+  // 保留本地备份
+  if (!fs.existsSync(CONFIG_DIR)) {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  }
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+async function getAuthorStyles() {
+  const settings = await getSettings();
+  return settings.authorStyles || [];
+}
+
+async function saveAuthorStyles(authorStyles) {
+  const settings = await getSettings();
+  settings.authorStyles = authorStyles;
+  await saveSettings(settings);
+}
+
+async function getPlatformStyles() {
+  const settings = await getSettings();
+  return settings.platformStyles || [];
+}
+
+async function savePlatformStyles(platformStyles) {
+  const settings = await getSettings();
+  settings.platformStyles = platformStyles;
+  await saveSettings(settings);
+}
+
+async function getReviewDimensions() {
+  const settings = await getSettings();
+  return settings.reviewDimensions || [];
+}
+
+async function saveReviewDimensions(reviewDimensions) {
+  const settings = await getSettings();
+  settings.reviewDimensions = reviewDimensions;
+  await saveSettings(settings);
+}
+
+async function getAuthorStyle(name) {
+  const styles = await getAuthorStyles();
+  const style = styles.find((s) => s.name === name);
+  return style ? style.description : '';
+}
+
+async function getPlatformStyle(name) {
+  const styles = await getPlatformStyles();
+  const style = styles.find((s) => s.name === name);
+  return style ? style.description : '';
+}
+
+async function buildReviewDimensionsText(stylePlaceholder = '') {
+  const dims = await getReviewDimensions();
+  if (!dims.length) return '';
+  return dims.map((d, i) => {
+    const desc = stylePlaceholder ? d.description.replace(/\{\{style\}\}/g, stylePlaceholder) : d.description;
+    return `${i + 1}. ${d.name}：${desc}\n   判断：[]  证据：`;
+  }).join('\n');
+}
+
+module.exports = {
+  seedSettings,
+  getSettings,
+  saveSettings,
+  getAuthorStyles,
+  saveAuthorStyles,
+  getPlatformStyles,
+  savePlatformStyles,
+  getReviewDimensions,
+  saveReviewDimensions,
+  getAuthorStyle,
+  getPlatformStyle,
+  buildReviewDimensionsText,
+};
