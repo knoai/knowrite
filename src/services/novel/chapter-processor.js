@@ -9,11 +9,11 @@
  */
 
 const { loadPrompt } = require('../prompt-loader');
-const { runStreamChat } = require('../core/chat');
+const { runStreamChat } = require('../../core/chat');
 const { resolveRoleModelConfig } = require('../settings-store');
 const { expandStyle } = require('./novel-utils');
 
-const engineCfg = require('../../config/engine.json');
+const engineCfg = require('../../../config/engine.json');
 
 async function generateChapterSummary(chapterContent, style, model, callbacks) {
   const prompt = await loadPrompt('summary', {

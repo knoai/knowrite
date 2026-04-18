@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const axiosRetry = require('axios-retry');
+const axiosRetry = require('axios-retry').default;
 const ProviderFactory = require('../providers/factory');
 
 // 为 axios 配置重试策略（针对 proxy 流式请求）

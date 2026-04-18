@@ -8,13 +8,13 @@
 
 const { readFile, writeFile } = require('../file-store');
 const { loadPrompt } = require('../prompt-loader');
-const { runStreamChat } = require('../core/chat');
+const { runStreamChat } = require('../../core/chat');
 const { resolveRoleModelConfig } = require('../settings-store');
 const { buildAntiRepetitionReminder } = require('../memory-index');
 const { buildRagContext } = require('../rag-retriever');
 const { getWorldContextForPrompt } = require('../world-context');
 
-const engineCfg = require('../../config/engine.json');
+const engineCfg = require('../../../config/engine.json');
 const SUMMARY_WINDOW_SIZE = engineCfg.context.summaryWindowSize;
 const FULL_TEXT_THRESHOLD = engineCfg.context.fullTextThreshold;
 

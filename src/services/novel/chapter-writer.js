@@ -35,7 +35,7 @@ const {
   extractTruthDeltaFromSummary,
 } = require('./chapter-processor');
 
-const engineCfg = require('../../config/engine.json');
+const engineCfg = require('../../../config/engine.json');
 
 // ============ 内部工具 ============
 
