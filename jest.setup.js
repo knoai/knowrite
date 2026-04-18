@@ -177,6 +177,95 @@ jest.mock('./src/models', () => {
     value: { type: DataTypes.TEXT, defaultValue: '{}' },
   }, { tableName: 'settings', timestamps: true });
 
+  const WorldLore = sequelize.define('WorldLore', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    category: { type: DataTypes.STRING, defaultValue: '其他' },
+    title: DataTypes.STRING,
+    content: DataTypes.TEXT,
+    tags: DataTypes.JSON,
+    importance: { type: DataTypes.INTEGER, defaultValue: 3 },
+  }, { tableName: 'world_lore', timestamps: true });
+
+  const Character = sequelize.define('Character', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    name: DataTypes.STRING,
+    alias: DataTypes.STRING,
+    roleType: { type: DataTypes.STRING, defaultValue: '配角' },
+    status: { type: DataTypes.STRING, defaultValue: '存活' },
+    appearance: DataTypes.TEXT,
+    personality: DataTypes.TEXT,
+    goals: DataTypes.TEXT,
+    background: DataTypes.TEXT,
+  }, { tableName: 'characters', timestamps: true });
+
+  const CharacterRelation = sequelize.define('CharacterRelation', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    fromCharId: DataTypes.INTEGER,
+    toCharId: DataTypes.INTEGER,
+    relationType: { type: DataTypes.STRING, defaultValue: '其他' },
+    description: DataTypes.TEXT,
+    strength: { type: DataTypes.INTEGER, defaultValue: 5 },
+    bidirectional: { type: DataTypes.BOOLEAN, defaultValue: false },
+  }, { tableName: 'character_relations', timestamps: true });
+
+  const PlotLine = sequelize.define('PlotLine', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    name: DataTypes.STRING,
+    type: { type: DataTypes.STRING, defaultValue: '主线' },
+    status: { type: DataTypes.STRING, defaultValue: '进行中' },
+  }, { tableName: 'plot_lines', timestamps: true });
+
+  const PlotNode = sequelize.define('PlotNode', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    plotLineId: DataTypes.INTEGER,
+    chapterNumber: DataTypes.INTEGER,
+    title: DataTypes.STRING,
+    description: DataTypes.TEXT,
+    nodeType: { type: DataTypes.STRING, defaultValue: '发展' },
+    position: { type: DataTypes.INTEGER, defaultValue: 0 },
+    status: { type: DataTypes.STRING, defaultValue: '待展开' },
+  }, { tableName: 'plot_nodes', timestamps: true });
+
+  const MapRegion = sequelize.define('MapRegion', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    name: DataTypes.STRING,
+    regionType: { type: DataTypes.STRING, defaultValue: '城市' },
+    parentId: DataTypes.INTEGER,
+    description: DataTypes.TEXT,
+  }, { tableName: 'map_regions', timestamps: true });
+
+  const MapConnection = sequelize.define('MapConnection', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    fromRegionId: DataTypes.INTEGER,
+    toRegionId: DataTypes.INTEGER,
+    connType: { type: DataTypes.STRING, defaultValue: '道路' },
+    description: DataTypes.TEXT,
+    travelTime: DataTypes.STRING,
+  }, { tableName: 'map_connections', timestamps: true });
+
+  const StoryTemplate = sequelize.define('StoryTemplate', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    scope: { type: DataTypes.STRING, defaultValue: 'global' },
+    workId: DataTypes.STRING,
+    name: DataTypes.STRING,
+    category: { type: DataTypes.STRING, defaultValue: '其他' },
+    description: DataTypes.TEXT,
+    beatStructure: DataTypes.JSON,
+  }, { tableName: 'story_templates', timestamps: true });
+
+  const WorkTemplateLink = sequelize.define('WorkTemplateLink', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    workId: DataTypes.STRING,
+    templateId: DataTypes.INTEGER,
+  }, { tableName: 'work_template_links', timestamps: true });
+
   // 基础关联
   Work.hasMany(Chapter, { foreignKey: 'workId' });
 
@@ -196,5 +285,8 @@ jest.mock('./src/models', () => {
     OutputQueue, OutputValidationRule,
     AuthorFingerprint, WorkStyleLink,
     Embedding, Setting,
+    WorldLore, Character, CharacterRelation,
+    PlotLine, PlotNode, MapRegion, MapConnection,
+    StoryTemplate, WorkTemplateLink,
   };
 });
