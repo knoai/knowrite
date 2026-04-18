@@ -247,7 +247,14 @@ class TemporalTruthService {
       order: [['chapterNumber', 'ASC'], ['eventSequence', 'ASC']],
     });
 
-    return this.computeStateFromEvents(events);
+    const state = this.computeStateFromEvents(events);
+    if (subjectType === 'character') {
+      return state.characterStates?.find((c) => c.charName === subjectId) || null;
+    }
+    if (subjectType === 'world') {
+      return state.worldState;
+    }
+    return state;
   }
 
   /**
@@ -509,7 +516,8 @@ class TemporalTruthService {
     // 3. 从大纲中提取伏笔（如果存在）
     let outlines;
     try {
-      outlines = typeof work.outlines === 'string' ? JSON.parse(work.outlines) : work.outlines;
+      const raw = work.outlines || work.outlineDetailed;
+      outlines = typeof raw === 'string' ? JSON.parse(raw) : raw;
     } catch {
       outlines = null;
     }
@@ -823,9 +831,9 @@ class TemporalTruthService {
 
   computeStateFromEvents(events) {
     // 简化版：从事件流重新计算状态
-    const state = { characterStates: [], worldState: {}, emotionalArcs: [] };
+    let state = { characterStates: [], worldState: {}, emotionalArcs: [] };
     for (const event of events) {
-      this.applyEvents({ ...state, emotionalArcs: [...state.emotionalArcs] }, [event]);
+      state = this.applyEvents({ ...state, emotionalArcs: [...state.emotionalArcs] }, [event]);
     }
     return state;
   }

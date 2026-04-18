@@ -63,6 +63,7 @@ jest.mock('./src/models', () => {
     chapterNumber: DataTypes.INTEGER,
     characterStates: DataTypes.JSON,
     worldState: DataTypes.JSON,
+    emotionalArcs: DataTypes.JSON,
     isMaterialized: DataTypes.BOOLEAN,
   }, { tableName: 'truth_states', timestamps: true });
 
