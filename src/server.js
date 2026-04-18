@@ -17,6 +17,8 @@ const inputGovernanceRouter = require('./routes/input-governance');
 const { getSettings } = require('./services/settings-store');
 const { requireAuth } = require('./middleware/auth');
 const { runStreamChat } = require('./core/chat');
+const { validateBody } = require('./middleware/validator');
+const { chatSchema, completionsSchema } = require('./schemas/chat');
 const netCfg = require('../config/network.json');
 
 const app = express();
@@ -112,20 +114,78 @@ app.use('/api/input-governance', inputGovernanceRouter);
 
 // 健康检查
 app.get('/health', async (req, res) => {
-  res.json({ status: 'ok', proxy: PROXY_BASE });
+  const checks = [];
+
+  // 1. 数据库连接检查
+  try {
+    const { sequelize } = require('./models');
+    await sequelize.authenticate();
+    checks.push({ name: 'database', status: 'ok', message: 'SQLite 连接正常' });
+  } catch (err) {
+    checks.push({ name: 'database', status: 'error', message: err.message });
+  }
+
+  // 2. 磁盘空间检查
+  try {
+    const { statfs } = require('fs').promises;
+    const stat = await statfs(process.cwd());
+    const freeGB = (stat.bavail * stat.bsize / (1024 ** 3)).toFixed(2);
+    const totalGB = (stat.blocks * stat.bsize / (1024 ** 3)).toFixed(2);
+    const usagePercent = (((stat.blocks - stat.bavail) / stat.blocks) * 100).toFixed(1);
+    const ok = parseFloat(usagePercent) < 90;
+    checks.push({
+      name: 'disk',
+      status: ok ? 'ok' : 'warning',
+      message: ok ? `磁盘使用 ${usagePercent}%` : `磁盘使用 ${usagePercent}%，空间不足`,
+      freeGB,
+      totalGB,
+      usagePercent: parseFloat(usagePercent),
+    });
+  } catch (err) {
+    checks.push({ name: 'disk', status: 'error', message: err.message });
+  }
+
+  // 3. Proxy 可达性检查
+  try {
+    await axios.head(`${PROXY_BASE}/health`, { timeout: 5000, validateStatus: () => true });
+    checks.push({ name: 'proxy', status: 'ok', message: 'Proxy 服务可达' });
+  } catch (err) {
+    checks.push({ name: 'proxy', status: 'warning', message: `Proxy 检查失败: ${err.message}` });
+  }
+
+  // 4. 内存使用检查
+  const mem = process.memoryUsage();
+  const heapUsedMB = (mem.heapUsed / 1024 / 1024).toFixed(1);
+  const heapTotalMB = (mem.heapTotal / 1024 / 1024).toFixed(1);
+  const memWarning = mem.heapUsed / mem.heapTotal > 0.85;
+  checks.push({
+    name: 'memory',
+    status: memWarning ? 'warning' : 'ok',
+    message: `堆内存使用 ${heapUsedMB}MB / ${heapTotalMB}MB`,
+    heapUsedMB: parseFloat(heapUsedMB),
+    heapTotalMB: parseFloat(heapTotalMB),
+  });
+
+  const healthy = checks.every((c) => c.status === 'ok');
+  const hasError = checks.some((c) => c.status === 'error');
+  const statusCode = hasError ? 503 : healthy ? 200 : 200;
+
+  res.status(statusCode).json({
+    status: hasError ? 'degraded' : healthy ? 'ok' : 'warning',
+    checks,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
 });
 
 // ========== 通用聊天接口 ==========
-app.post('/chat', async (req, res, next) => {
+app.post('/chat', validateBody(chatSchema), async (req, res, next) => {
   const startTime = Date.now();
-  const { messages, model = 'deepseek-v3', provider: reqProvider, temperature = 0.7 } = req.body;
-  const stream = req.body.stream !== false;
+  const { messages, model = 'deepseek-v3', provider: reqProvider, temperature = 0.7 } = req.validatedBody;
+  const stream = req.validatedBody.stream !== false;
   const providerName = (reqProvider || process.env.PROVIDER || 'yuanbao').toLowerCase();
 
   try {
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'BadRequest', message: 'messages is required and must be an array' });
-    }
 
     if (isWebProvider(providerName)) {
       // Web Provider → 转发到 proxy
@@ -179,16 +239,13 @@ app.post('/chat', async (req, res, next) => {
 });
 
 // ========== OpenAI 兼容接口 ==========
-app.post('/v1/chat/completions', async (req, res, next) => {
+app.post('/v1/chat/completions', validateBody(completionsSchema), async (req, res, next) => {
   const startTime = Date.now();
-  const { messages, model } = req.body;
-  const stream = req.body.stream === true;
-  const providerName = (req.body.provider || process.env.PROVIDER || 'yuanbao').toLowerCase();
+  const { messages, model } = req.validatedBody;
+  const stream = req.validatedBody.stream === true;
+  const providerName = (req.validatedBody.provider || process.env.PROVIDER || 'yuanbao').toLowerCase();
 
   try {
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'BadRequest', message: 'messages is required and must be an array' });
-    }
 
     if (isWebProvider(providerName)) {
       // Web Provider → 转发到 proxy

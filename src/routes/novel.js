@@ -1,7 +1,8 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { startNovel, continueNovel, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, expandStyle, listWorks, getWorkDir, loadMeta } = require('../services/novel-engine');
+const { startNovel, continueNovel, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, listWorks, getWorkDir, loadMeta } = require('../services/novel-engine');
+const { expandStyle } = require('../services/novel/novel-utils');
 const { loadPrompt } = require('../services/prompt-loader');
 const { checkContentRepetition, repairContentRepetition } = require('../services/memory-index');
 const { loadFitness } = require('../services/fitness-evaluator');

@@ -139,14 +139,22 @@ jest.mock('./src/models', () => {
 
   const Embedding = sequelize.define('Embedding', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    workId: DataTypes.STRING,
+    workId: { type: DataTypes.STRING, allowNull: false },
     chapterNumber: DataTypes.INTEGER,
-    sourceType: DataTypes.STRING,
+    sourceType: { type: DataTypes.STRING, allowNull: false },
     sourceId: DataTypes.STRING,
     content: DataTypes.TEXT,
     embedding: DataTypes.TEXT,
     model: DataTypes.STRING,
-  }, { tableName: 'embeddings', timestamps: true });
+  }, {
+    tableName: 'embeddings',
+    timestamps: true,
+    indexes: [
+      { fields: ['workId'] },
+      { fields: ['workId', 'sourceType'] },
+      { unique: true, fields: ['workId', 'sourceType', 'sourceId'] },
+    ],
+  });
 
   const Setting = sequelize.define('Setting', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },

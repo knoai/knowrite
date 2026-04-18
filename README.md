@@ -22,7 +22,7 @@ AI Agent 自主写小说——写、审、改、评，全程接管。基于多 A
 
 **Knowrite 是一个 Node.js / Express 后端服务**，提供从大纲生成、章节撰写、编辑评审、去 AI 化、读者反馈到质量评估的完整自动化小说创作 API。支持任意 OpenAI-compatible Provider（百炼、Ollama、LM Studio 等），零外部向量库依赖，单节点即可运行。
 
-配套前端 [`knowrite-ui`](https://github.com/igoryu/knowrite-ui)（React 19 + Vite + Tailwind CSS，MIT 协议）提供作品管理、实时创作流可视化、Fitness 看板、世界观编辑和 Prompt 管理。
+配套前端 [`knowrite-ui`](https://github.com/knoai/knowrite-ui)（React 19 + Vite + Tailwind CSS，MIT 协议）提供作品管理、实时创作流可视化、Fitness 看板、世界观编辑和 Prompt 管理。
 
 ---
 
@@ -37,7 +37,7 @@ AI Agent 自主写小说——写、审、改、评，全程接管。基于多 A
 
 ```bash
 # 克隆后端仓库
-git clone https://github.com/igoryu/knowrite.git
+git clone https://github.com/knoai/knowrite.git
 cd knowrite
 
 # 安装依赖
