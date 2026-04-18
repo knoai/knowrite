@@ -289,4 +289,8 @@ async function applyCandidate(templateName, candidatePath) {
 module.exports = {
   evolvePrompt,
   applyCandidate,
+  gatherEvalDataset,
+  generateVariants,
+  evaluateVariant,
+  analyzeFailures,
 };
