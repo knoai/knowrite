@@ -1,0 +1,6 @@
+{
+  "directory": "../../prompts",
+  "extension": ".md",
+  "coreRulesName": "core-rules",
+  "freeSuffix": "-free"
+}
