@@ -43,4 +43,30 @@ describe('file-store', () => {
     expect(result['b.txt']).toBe('B');
     expect(result['missing.txt']).toBe('');
   });
+
+  test('appendToFile appends content', async () => {
+    await fileStore.writeFile(workId, 'append.txt', 'line1\n');
+    await fileStore.appendToFile(workId, 'append.txt', 'line2\n');
+    const content = await fileStore.readFile(workId, 'append.txt');
+    expect(content).toBe('line1\nline2\n');
+  });
+
+  test('invalidateCache forces DB read on next access', async () => {
+    await fileStore.writeFile(workId, 'invalidate.txt', 'original');
+    await fileStore.readFile(workId, 'invalidate.txt'); // populate cache
+    // Directly update DB to simulate external change
+    const { WorkFile } = require('../src/models');
+    await WorkFile.update(
+      { content: 'updated' },
+      { where: { workId, filename: 'invalidate.txt' } }
+    );
+    // Without invalidation, cache still returns old value
+    const cached = await fileStore.readFile(workId, 'invalidate.txt');
+    expect(cached).toBe('original');
+
+    // After invalidation, should read updated value
+    fileStore.invalidateCache(workId, 'invalidate.txt');
+    const fresh = await fileStore.readFile(workId, 'invalidate.txt');
+    expect(fresh).toBe('updated');
+  });
 });
