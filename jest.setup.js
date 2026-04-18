@@ -95,6 +95,8 @@ jest.mock('./src/models', () => {
     longTermVision: DataTypes.TEXT,
     themes: DataTypes.JSON,
     constraints: DataTypes.JSON,
+    mustKeep: DataTypes.TEXT,
+    mustAvoid: DataTypes.TEXT,
   }, { tableName: 'author_intents', timestamps: true });
 
   const CurrentFocus = sequelize.define('CurrentFocus', {
@@ -103,6 +105,7 @@ jest.mock('./src/models', () => {
     focusText: DataTypes.TEXT,
     targetChapters: DataTypes.INTEGER,
     isActive: DataTypes.BOOLEAN,
+    priority: DataTypes.INTEGER,
   }, { tableName: 'current_focuses', timestamps: true });
 
   const ChapterIntent = sequelize.define('ChapterIntent', {
@@ -111,7 +114,12 @@ jest.mock('./src/models', () => {
     chapterNumber: DataTypes.INTEGER,
     mustKeep: DataTypes.TEXT,
     mustAvoid: DataTypes.TEXT,
+    sceneBeats: DataTypes.JSON,
+    conflictResolution: DataTypes.TEXT,
+    emotionalGoal: DataTypes.TEXT,
     ruleStack: DataTypes.JSON,
+    plannedAt: DataTypes.DATE,
+    composedAt: DataTypes.DATE,
   }, { tableName: 'chapter_intents', timestamps: true });
 
   const OutputQueue = sequelize.define('OutputQueue', {
@@ -142,8 +150,13 @@ jest.mock('./src/models', () => {
   const AuthorFingerprint = sequelize.define('AuthorFingerprint', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     name: DataTypes.STRING,
+    description: DataTypes.TEXT,
     narrativeLayer: DataTypes.JSON,
     characterLayer: DataTypes.JSON,
+    plotLayer: DataTypes.JSON,
+    languageLayer: DataTypes.JSON,
+    worldLayer: DataTypes.JSON,
+    sampleParagraphs: DataTypes.JSON,
   }, { tableName: 'author_fingerprints', timestamps: true });
 
   const WorkStyleLink = sequelize.define('WorkStyleLink', {
@@ -151,6 +164,7 @@ jest.mock('./src/models', () => {
     workId: DataTypes.STRING,
     fingerprintId: DataTypes.INTEGER,
     isActive: DataTypes.BOOLEAN,
+    priority: DataTypes.INTEGER,
   }, { tableName: 'work_style_links', timestamps: true });
 
   const Embedding = sequelize.define('Embedding', {
