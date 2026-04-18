@@ -1,0 +1,43 @@
+{
+  "context": {
+    "summaryWindowSize": 5,
+    "fullTextThreshold": 4
+  },
+  "editing": {
+    "maxEditRounds": 3,
+    "maxEditRoundsFree": 1,
+    "passKeywords": ["【评审结果：通过】", "评审结果：pass", "无需修改"]
+  },
+  "truncation": {
+    "workIdTopicLength": 30,
+    "workTitleLength": 40,
+    "workDescLength": 120,
+    "chapterContentPreview": 3000,
+    "previousChapterReference": 1500,
+    "editDraftPreview": 3000,
+    "deviationCheckText": 4000,
+    "traceInputOutput": 500
+  },
+  "generation": {
+    "defaultStrategy": "pipeline",
+    "multivolumeTotalVolumes": 3,
+    "importSplitRatio": 0.75
+  },
+  "fileNames": {
+    "outlineTheme": "outline_theme.txt",
+    "outlineDetailed": "outline_detailed.txt",
+    "outlineMultivolume": "outline_multivolume.txt",
+    "fullText": "full.txt",
+    "chapterRaw": "chapter_{n}_raw.txt",
+    "chapterEdit": "chapter_{n}_edit.txt",
+    "chapterEdited": "chapter_{n}_edited.txt",
+    "chapterHumanized": "chapter_{n}_humanized.txt",
+    "chapterFinal": "chapter_{n}_final.txt",
+    "chapterFeedback": "chapter_{n}_feedback.json",
+    "chapterSummary": "chapter_{n}_summary.txt",
+    "chapterPolish": "chapter_{n}_polish.txt",
+    "chapterCompressed": "chapter_{n}_compressed.txt",
+    "volumeOutline": "volume_{n}_outline.txt",
+    "distantSummary": "context_distant_summary_{start}_{end}.txt"
+  }
+}
