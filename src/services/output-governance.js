@@ -227,7 +227,7 @@ class OutputGovernanceService {
   async loadChapterText(workId, chapterNumber) {
     const chapter = await Chapter.findOne({ where: { workId, number: chapterNumber } });
     if (!chapter) return '';
-    return await fileStore.readFile(chapter.finalFile || chapter.rawFile) || '';
+    return await fileStore.readFile(workId, chapter.finalFile || chapter.rawFile) || '';
   }
 
   triggerQueueProcessing() {

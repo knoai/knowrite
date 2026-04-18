@@ -175,4 +175,5 @@ async function getWorldContextForPrompt(workId, chapterNumber) {
 
 module.exports = {
   getWorldContextForPrompt,
+  buildWorldContext,
 };

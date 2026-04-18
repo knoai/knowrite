@@ -2,7 +2,6 @@
  * 输入治理服务：plan + compose，零 LLM 调用
  */
 
-const { getWorkDir } = require('../core/paths');
 const fileStore = require('./file-store');
 const { AuthorIntent, CurrentFocus, ChapterIntent, Work } = require('../models');
 
@@ -36,9 +35,9 @@ async function planChapter(workId, chapterNumber) {
 
   await ChapterIntent.upsert(intent);
 
-  const workDir = getWorkDir(workId);
   await fileStore.writeFile(
-    `${workDir}/runtime/chapter_${chapterNumber}_intent.json`,
+    workId,
+    `runtime/chapter_${chapterNumber}_intent.json`,
     JSON.stringify(intent, null, 2)
   );
 
@@ -71,9 +70,9 @@ async function composeChapter(workId, chapterNumber) {
     composedAt: new Date(),
   };
 
-  const workDir = getWorkDir(workId);
   await fileStore.writeFile(
-    `${workDir}/runtime/chapter_${chapterNumber}_compose.json`,
+    workId,
+    `runtime/chapter_${chapterNumber}_compose.json`,
     JSON.stringify(composed, null, 2)
   );
 

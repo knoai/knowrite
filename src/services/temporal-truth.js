@@ -527,24 +527,22 @@ class TemporalTruthService {
   // ==================== 投影文件生成 ====================
 
   async regenerateProjections(workId) {
-    const workDir = getWorkDir(workId);
-
     // 1. 生成 current_state.md 投影
     const latestState = await this.getCurrentState(workId);
     if (latestState) {
       const stateText = this.renderStateProjection(latestState);
-      await fileStore.writeFile(`${workDir}/truth/current_state.md`, stateText);
+      await fileStore.writeFile(workId, 'truth/current_state.md', stateText);
     }
 
     // 2. 生成 pending_hooks.md 投影
     const openHooks = await this.getOpenHooks(workId);
     const hooksText = this.renderHooksProjection(openHooks);
-    await fileStore.writeFile(`${workDir}/truth/pending_hooks.md`, hooksText);
+    await fileStore.writeFile(workId, 'truth/pending_hooks.md', hooksText);
 
     // 3. 生成 resource_ledger.md 投影
     const resources = await TruthResource.findAll({ where: { workId } });
     const resourcesText = this.renderResourcesProjection(resources);
-    await fileStore.writeFile(`${workDir}/truth/resource_ledger.md`, resourcesText);
+    await fileStore.writeFile(workId, 'truth/resource_ledger.md', resourcesText);
   }
 
   renderStateProjection(state) {

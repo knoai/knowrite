@@ -7,8 +7,6 @@
 
 const temporalTruth = require('./temporal-truth');
 const { TruthHook, TruthResource } = require('../models');
-const fileStore = require('./file-store');
-const { getWorkDir } = require('../core/paths');
 
 /**
  * 初始化 truth 文件（从现有作品数据逆向工程）

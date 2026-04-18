@@ -9,7 +9,6 @@
  */
 
 const { AuthorFingerprint, WorkStyleLink } = require('../models');
-const { chat } = require('../core/chat');
 
 class AuthorFingerprintService {
 

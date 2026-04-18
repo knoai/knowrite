@@ -590,6 +590,10 @@ const ChapterIntent = sequelize.define('ChapterIntent', {
   ],
 });
 
+Work.hasMany(AuthorIntent, { foreignKey: 'workId', sourceKey: 'workId', as: 'authorIntents' });
+Work.hasMany(CurrentFocus, { foreignKey: 'workId', sourceKey: 'workId', as: 'currentFocuses' });
+Work.hasMany(ChapterIntent, { foreignKey: 'workId', sourceKey: 'workId', as: 'chapterIntents' });
+
 let initialized = false;
 async function initDb() {
   if (initialized) return;
