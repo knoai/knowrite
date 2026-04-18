@@ -1,0 +1,13 @@
+{
+  "defaultLang": "zh",
+  "supportedLangs": ["zh", "en", "ja", "ko"],
+  "promptLangDir": "prompts",
+  "fitnessLangConfig": {
+    "zh": { "weightsKey": "industrial", "reviewPreset": "33" },
+    "en": { "weightsKey": "industrial", "reviewPreset": "15" },
+    "ja": { "weightsKey": "free", "reviewPreset": "8" },
+    "ko": { "weightsKey": "free", "reviewPreset": "8" }
+  },
+  "apiLangParam": "lang",
+  "fallbackLang": "zh"
+}
