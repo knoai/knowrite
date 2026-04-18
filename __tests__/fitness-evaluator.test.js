@@ -174,11 +174,59 @@ describe('fitness-evaluator', () => {
     it('should fallback on coherence detection error', async () => {
       const { detectOutlineDeviation } = require('../src/services/novel-engine');
       detectOutlineDeviation.mockRejectedValue(new Error('LLM timeout'));
-      fileStore.readFile.mockResolvedValue(null);
+      fileStore.readFile.mockImplementation((wid, fname) => {
+        if (fname === 'chapter_1_final.txt') return 'chapter content';
+        return null;
+      });
 
       const result = await evaluateChapterFitness(workId, 1, 2000);
       expect(result.score).toBeGreaterThan(0);
       expect(result.score).toBeLessThanOrEqual(1);
+    });
+
+    it('should run coherence detection when chapter text exists', async () => {
+      const { detectOutlineDeviation } = require('../src/services/novel-engine');
+      detectOutlineDeviation.mockResolvedValue({ severity: 'medium' });
+      fileStore.readFile.mockImplementation((wid, fname) => {
+        if (fname === 'chapter_1_final.txt') return 'chapter content';
+        return null;
+      });
+
+      const result = await evaluateChapterFitness(workId, 1, 2000);
+      expect(result.breakdown.coherenceScore).toBe(0.6);
+    });
+
+    it('should handle malformed repetition JSON gracefully', async () => {
+      fileStore.readFile.mockImplementation((wid, fname) => {
+        if (fname === 'chapter_1_repetition.json') return 'invalid json';
+        return null;
+      });
+
+      const result = await evaluateChapterFitness(workId, 1, 2000);
+      expect(result.breakdown.repScore).toBe(1);
+      expect(result.sources.repetition).toBe(false);
+    });
+
+    it('should handle malformed reader feedback JSON gracefully', async () => {
+      fileStore.readFile.mockImplementation((wid, fname) => {
+        if (fname === 'chapter_1_feedback.json') return 'not-json';
+        return null;
+      });
+
+      const result = await evaluateChapterFitness(workId, 1, 2000);
+      expect(result.breakdown.readerScore).toBe(0.5);
+      expect(result.sources.reader).toBe(false);
+    });
+
+    it('should handle malformed review JSON gracefully', async () => {
+      const reviewDir = path.join(workDir, 'review_chapter_3');
+      fs.mkdirSync(reviewDir, { recursive: true });
+      fs.writeFileSync(path.join(reviewDir, 'round_1.json'), 'invalid json', 'utf-8');
+      fileStore.readFile.mockResolvedValue(null);
+
+      const result = await evaluateChapterFitness(workId, 3, 2000);
+      expect(result.breakdown.reviewScore).toBe(0.5);
+      expect(result.sources.review).toBe(false);
     });
   });
 
