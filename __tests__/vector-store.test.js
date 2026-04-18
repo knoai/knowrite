@@ -5,7 +5,21 @@ const {
   listEmbeddings,
   deleteEmbeddingsByWorkId,
   rebuildIndex,
+  generateEmbedding,
 } = require('../src/services/vector-store');
+
+jest.mock('../src/services/settings-store', () => ({
+  getModelConfig: jest.fn(),
+}));
+
+jest.mock('../src/providers/factory', () => ({
+  create: jest.fn().mockReturnValue({
+    embed: jest.fn().mockResolvedValue([[0.1, 0.2, 0.3]]),
+  }),
+}));
+
+const { getModelConfig } = require('../src/services/settings-store');
+const ProviderFactory = require('../src/providers/factory');
 
 describe('vector-store cosineSimilarity', () => {
   test('identical vectors have similarity 1', () => {
@@ -83,14 +97,14 @@ describe('vector-store SQLite persistence', () => {
   });
 
   test('searchSimilar fallback returns relevant results', async () => {
-    // 插入 3 条 embedding（低于 HNSW INDEX_THRESHOLD=50，走 fallback）
+    // Insert 3 embeddings (below HNSW INDEX_THRESHOLD=50, uses fallback)
     await saveEmbedding(workId, 1, 'summary', 'c1', 'apple pie', [1, 0, 0, 0], 'm1');
     await saveEmbedding(workId, 2, 'summary', 'c2', 'banana bread', [0, 1, 0, 0], 'm1');
     await saveEmbedding(workId, 3, 'summary', 'c3', 'cherry tart', [0.9, 0.1, 0, 0], 'm1');
 
     const results = await searchSimilar(workId, [1, 0, 0, 0], { topK: 2, minScore: 0.5 });
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].sourceId).toBe('c1'); // 最相似
+    expect(results[0].sourceId).toBe('c1'); // most similar
     expect(results[0].score).toBe(1);
   });
 
@@ -103,7 +117,7 @@ describe('vector-store SQLite persistence', () => {
       beforeChapter: 5,
       minScore: 0.5,
     });
-    // c5 的 chapterNumber=5 >= beforeChapter=5，应被过滤
+    // c5 chapterNumber=5 >= beforeChapter=5, should be filtered
     expect(results.every((r) => r.chapterNumber < 5)).toBe(true);
   });
 
@@ -120,6 +134,18 @@ describe('vector-store SQLite persistence', () => {
     expect(results[0].sourceType).toBe('summary');
   });
 
+  test('searchSimilar filters by minScore', async () => {
+    await saveEmbedding(workId, 1, 'summary', 'close', 'close content', [0.99, 0.01, 0, 0], 'm1');
+    await saveEmbedding(workId, 2, 'summary', 'far', 'far content', [0, 1, 0, 0], 'm1');
+
+    const results = await searchSimilar(workId, [1, 0, 0, 0], {
+      topK: 5,
+      minScore: 0.95,
+    });
+    expect(results.length).toBe(1);
+    expect(results[0].sourceId).toBe('close');
+  });
+
   test('deleteEmbeddingsByWorkId removes all records', async () => {
     await saveEmbedding(workId, 1, 'summary', 'c1', 'content', [1, 0, 0, 0], 'm1');
     await deleteEmbeddingsByWorkId(workId);
@@ -130,7 +156,83 @@ describe('vector-store SQLite persistence', () => {
   test('rebuildIndex returns null for small dataset', async () => {
     await saveEmbedding(workId, 1, 'summary', 'c1', 'content', [1, 0, 0, 0], 'm1');
     const index = await rebuildIndex(workId);
-    // 1 条记录 < INDEX_THRESHOLD(50)，应返回 null
+    // 1 record < INDEX_THRESHOLD(50), should return null
     expect(index).toBeNull();
+  });
+
+  test('saveEmbedding updates existing record by unique index', async () => {
+    await saveEmbedding(workId, 1, 'summary', 'same', 'old content', [1, 0, 0, 0], 'm1');
+    const updated = await saveEmbedding(workId, 2, 'summary', 'same', 'new content', [0.9, 0.1, 0, 0], 'm1');
+    expect(updated.content).toBe('new content');
+    const all = await listEmbeddings(workId);
+    expect(all.length).toBe(1);
+  });
+});
+
+describe('vector-store generateEmbedding', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('generateEmbedding calls provider embed with string', async () => {
+    getModelConfig.mockResolvedValue({
+      embedder: { provider: 'openai', model: 'm1' },
+      providers: { openai: {} },
+    });
+    const result = await generateEmbedding('hello', 'm1');
+    expect(result).toEqual([0.1, 0.2, 0.3]);
+  });
+
+  test('generateEmbedding handles array input', async () => {
+    getModelConfig.mockResolvedValue({
+      embedder: { provider: 'openai' },
+      providers: { openai: {} },
+    });
+    const mockEmbed = jest.fn().mockResolvedValue([[0.1], [0.2]]);
+    ProviderFactory.create.mockReturnValue({ embed: mockEmbed });
+    const result = await generateEmbedding(['a', 'b']);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(2);
+  });
+});
+
+describe('vector-store HNSW index path', () => {
+  const workId = 'test-work-hnsw';
+
+  beforeEach(async () => {
+    await deleteEmbeddingsByWorkId(workId);
+  });
+
+  afterAll(async () => {
+    await deleteEmbeddingsByWorkId(workId);
+  });
+
+  test('searchSimilar uses HNSW when enough embeddings exist', async () => {
+    // Insert 52 embeddings to exceed INDEX_THRESHOLD=50
+    const promises = [];
+    for (let i = 0; i < 52; i++) {
+      const vec = Array(4).fill(0);
+      vec[0] = i / 52;
+      promises.push(saveEmbedding(workId, i + 1, 'summary', `c${i}`, `content ${i}`, vec, 'm1'));
+    }
+    await Promise.all(promises);
+
+    const results = await searchSimilar(workId, [1, 0, 0, 0], { topK: 3, minScore: 0.5 });
+    expect(results.length).toBeGreaterThan(0);
+    // The most similar to [1,0,0,0] should have high first component
+    expect(results[0].score).toBeGreaterThan(0.5);
+  });
+
+  test('rebuildIndex builds HNSW when threshold met', async () => {
+    const promises = [];
+    for (let i = 0; i < 52; i++) {
+      const vec = Array(4).fill(0).map((_, j) => (j === i % 4 ? 1 : 0));
+      promises.push(saveEmbedding(workId, i + 1, 'summary', `c${i}`, `content`, vec, 'm1'));
+    }
+    await Promise.all(promises);
+
+    const index = await rebuildIndex(workId);
+    expect(index).not.toBeNull();
+    expect(index.count).toBe(52);
   });
 });
