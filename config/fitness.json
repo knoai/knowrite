@@ -1,0 +1,34 @@
+{
+  "weights": {
+    "industrial": {
+      "wordCount": 0.15,
+      "repetition": 0.20,
+      "review": 0.25,
+      "reader": 0.20,
+      "coherence": 0.20
+    },
+    "free": {
+      "wordCount": 0.05,
+      "repetition": 0.20,
+      "review": 0.25,
+      "reader": 0.20,
+      "coherence": 0.30
+    }
+  },
+  "scoring": {
+    "wordCountSigmaFactor": 0.175,
+    "wordCountSigmaMin": 200,
+    "wordCountSigmaMaxFactor": 0.25,
+    "wordCountSigmaMaxMin": 400,
+    "repetitionSeverity": {
+      "high": 0,
+      "medium": 0.5,
+      "low": 0.85,
+      "none": 1.0
+    },
+    "defaultReviewScore": 0.5,
+    "defaultReaderSubScore": 5,
+    "painPenalty": 0.1,
+    "maxScore": 10
+  }
+}
