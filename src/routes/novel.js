@@ -8,7 +8,7 @@ const { checkContentRepetition, repairContentRepetition } = require('../services
 const { loadFitness } = require('../services/fitness-evaluator');
 const { evolvePrompt, applyCandidate } = require('../services/prompt-evolver');
 const { listPrompts } = require('../services/prompt-loader');
-const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode } = require('../services/settings-store');
+const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, switchProvider, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode } = require('../services/settings-store');
 const fileStore = require('../services/file-store');
 const { readFile } = fileStore;
 const { validateBody } = require('../middleware/validator');
@@ -565,6 +565,19 @@ router.post('/model-config', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/switch-provider', async (req, res) => {
+  try {
+    const { provider } = req.body || {};
+    if (!provider) {
+      return res.status(400).json({ error: '缺少 provider 参数' });
+    }
+    const result = await switchProvider(provider);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

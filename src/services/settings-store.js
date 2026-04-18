@@ -331,6 +331,61 @@ async function resolveRoleModelConfig(role, override) {
   return base;
 }
 
+const PROVIDER_ROLE_MAPS = {
+  yuanbao: {
+    writer: 'deepseek-v3', editor: 'deepseek-r1', humanizer: 'hunyuan', polish: 'hunyuan',
+    proofreader: 'deepseek-v3', reader: 'deepseek-v3', summarizer: 'deepseek-v3', reviewer: 'deepseek-v3',
+    planner: 'deepseek-r1', outline: 'deepseek-r1', product: 'deepseek-v3', tech: 'deepseek-r1',
+    reviser: 'deepseek-v3', synthesis: 'deepseek-r1', repetitionRepair: 'deepseek-v3',
+    deviationCheck: 'deepseek-r1', styleCorrect: 'deepseek-v3', expandStyle: 'deepseek-v3',
+    promptEvolve: 'deepseek-r1', fitnessEvaluate: 'deepseek-v3',
+  },
+  doubao: {
+    writer: 'doubao-1.5-pro', editor: 'doubao-1.5-thinking-pro', humanizer: 'doubao-1.5-pro', polish: 'doubao-1.5-pro',
+    proofreader: 'doubao-1.5-pro', reader: 'doubao-1.5-pro', summarizer: 'doubao-1.5-pro', reviewer: 'doubao-1.5-pro',
+    planner: 'doubao-1.5-thinking-pro', outline: 'doubao-1.5-thinking-pro', product: 'doubao-1.5-pro', tech: 'doubao-1.5-thinking-pro',
+    reviser: 'doubao-1.5-pro', synthesis: 'doubao-1.5-thinking-pro', repetitionRepair: 'doubao-1.5-pro',
+    deviationCheck: 'doubao-1.5-thinking-pro', styleCorrect: 'doubao-1.5-pro', expandStyle: 'doubao-1.5-pro',
+    promptEvolve: 'doubao-1.5-thinking-pro', fitnessEvaluate: 'doubao-1.5-pro',
+  },
+  qwen: {
+    writer: 'Qwen3-Max', editor: 'Qwen3-Max-Thinking', humanizer: 'Qwen3.5', polish: 'Qwen3.5',
+    proofreader: 'Qwen3-Max', reader: 'Qwen3-Max', summarizer: 'Qwen3-Max', reviewer: 'Qwen3-Max',
+    planner: 'Qwen3-Max-Thinking', outline: 'Qwen3-Max-Thinking', product: 'Qwen3-Max', tech: 'Qwen3-Max-Thinking',
+    reviser: 'Qwen3-Max', synthesis: 'Qwen3-Max-Thinking', repetitionRepair: 'Qwen3-Max',
+    deviationCheck: 'Qwen3-Max-Thinking', styleCorrect: 'Qwen3-Max', expandStyle: 'Qwen3-Max',
+    promptEvolve: 'Qwen3-Max-Thinking', fitnessEvaluate: 'Qwen3-Max',
+  },
+  kimi: {
+    writer: 'kimi-k2', editor: 'kimi-k1', humanizer: 'k2.5快速', polish: 'k2.5快速',
+    proofreader: 'kimi-k2', reader: 'kimi-k2', summarizer: 'kimi-k2', reviewer: 'kimi-k2',
+    planner: 'kimi-k1', outline: 'kimi-k1', product: 'kimi-k2', tech: 'kimi-k1',
+    reviser: 'kimi-k2', synthesis: 'kimi-k1', repetitionRepair: 'kimi-k2',
+    deviationCheck: 'kimi-k1', styleCorrect: 'kimi-k2', expandStyle: 'kimi-k2',
+    promptEvolve: 'kimi-k1', fitnessEvaluate: 'kimi-k2',
+  },
+};
+
+async function switchProvider(provider) {
+  const roleMap = PROVIDER_ROLE_MAPS[provider];
+  if (!roleMap) {
+    throw new Error(`不支持的模型提供商: ${provider}。支持的: ${Object.keys(PROVIDER_ROLE_MAPS).join(', ')}`);
+  }
+  const cfg = await getModelConfig();
+  cfg.defaultProvider = provider;
+  cfg.roleDefaults = cfg.roleDefaults || {};
+  for (const [role, model] of Object.entries(roleMap)) {
+    const existing = cfg.roleDefaults[role] || {};
+    cfg.roleDefaults[role] = {
+      provider,
+      model,
+      temperature: typeof existing.temperature === 'number' ? existing.temperature : 0.7,
+    };
+  }
+  await saveModelConfig(cfg);
+  return { switched: true, provider, rolesUpdated: Object.keys(roleMap).length };
+}
+
 async function resolveWriterModel(chapterNumber, override) {
   const cfg = await getModelConfig();
   const rotation = cfg.writerRotation;
@@ -399,6 +454,7 @@ module.exports = {
   buildReviewDimensionsText,
   getModelConfig,
   saveModelConfig,
+  switchProvider,
   getRoleModelConfig,
   resolveRoleModelConfig,
   resolveWriterModel,

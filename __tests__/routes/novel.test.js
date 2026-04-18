@@ -62,6 +62,7 @@ jest.mock('../../src/services/settings-store', () => ({
   setReviewPreset: jest.fn().mockResolvedValue(undefined),
   getModelConfig: jest.fn().mockResolvedValue({ provider: 'openai', model: 'gpt-4' }),
   saveModelConfig: jest.fn().mockResolvedValue(undefined),
+  switchProvider: jest.fn().mockResolvedValue({ switched: true, provider: 'kimi', rolesUpdated: 20 }),
   getChapterConfig: jest.fn().mockResolvedValue({ targetWords: 2000 }),
   saveChapterConfig: jest.fn().mockResolvedValue(undefined),
   getWritingMode: jest.fn().mockResolvedValue('industrial'),
@@ -251,6 +252,23 @@ describe('novel routes (non-SSE)', () => {
         .send({ preset: 'strict' });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+    });
+
+    it('POST /switch-provider should switch all roles', async () => {
+      const store = require('../../src/services/settings-store');
+      const res = await request(app)
+        .post('/api/novel/switch-provider')
+        .send({ provider: 'kimi' });
+      expect(res.status).toBe(200);
+      expect(res.body.switched).toBe(true);
+      expect(store.switchProvider).toHaveBeenCalledWith('kimi');
+    });
+
+    it('POST /switch-provider should reject missing provider', async () => {
+      const res = await request(app)
+        .post('/api/novel/switch-provider')
+        .send({});
+      expect(res.status).toBe(400);
     });
 
     it('GET /writing-mode should return mode', async () => {
