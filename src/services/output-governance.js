@@ -62,9 +62,11 @@ class OutputGovernanceService {
         if (!item) break;
 
         await this.runL1Validation(item);
+        await item.reload();
         if (item.status === 'l1_failed') continue;
 
         await this.runL2Validation(item);
+        await item.reload();
         if (item.status === 'l2_failed') continue;
 
         if (await this.requiresHumanReview(item)) {

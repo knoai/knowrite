@@ -1,5 +1,5 @@
 const outputGovernance = require('../src/services/output-governance');
-const { OutputQueue, OutputValidationRule, Chapter, initDb } = require('../src/models');
+const { OutputQueue, OutputValidationRule, Chapter, Work, initDb } = require('../src/models');
 
 jest.mock('../src/services/file-store', () => ({
   readFile: jest.fn().mockResolvedValue('第1章\n\n测试章节内容，字数足够多。'),
@@ -192,6 +192,49 @@ describe('output-governance', () => {
       expect(result.passed).toBe(false);
     });
 
+    test('min_word_count evaluates text length', async () => {
+      const { readFile } = require('../src/services/file-store');
+      readFile.mockResolvedValueOnce('第1章\n\n这是一个非常长的章节内容，字数肯定超过了最低要求。');
+      await Work.create({ workId, topic: 'test' });
+      await Chapter.create({ workId, number: 1, rawFile: 'ch1.txt' });
+      const item = await OutputQueue.create({ workId, chapterNumber: 1, status: 'pending', priority: 5 });
+
+      const result = await outputGovernance.evaluateRule(
+        { name: 'wordcount', condition: { type: 'min_word_count', value: 10 } },
+        item
+      );
+      expect(result.passed).toBe(true);
+      expect(result.actual).toBeGreaterThanOrEqual(10);
+    });
+
+    test('format_compliance checks chapter title', async () => {
+      const { readFile } = require('../src/services/file-store');
+      readFile.mockResolvedValueOnce('第1章\n\n内容');
+      await Work.findOrCreate({ where: { workId }, defaults: { topic: 'test' } });
+      await Chapter.create({ workId, number: 2, rawFile: 'ch2.txt' });
+      const item = await OutputQueue.create({ workId, chapterNumber: 2, status: 'pending', priority: 5 });
+
+      const result = await outputGovernance.evaluateRule(
+        { name: 'format', condition: { type: 'format_compliance' } },
+        item
+      );
+      expect(result.passed).toBe(true);
+    });
+
+    test('max_style_deviation passes when no fingerprints', async () => {
+      const { readFile } = require('../src/services/file-store');
+      readFile.mockResolvedValueOnce('text');
+      const styleService = require('../src/services/author-fingerprint');
+      styleService.getActiveFingerprints.mockResolvedValueOnce([]);
+
+      const item = await OutputQueue.create({ workId, chapterNumber: 1, status: 'pending', priority: 5 });
+      const result = await outputGovernance.evaluateRule(
+        { name: 'style', condition: { type: 'max_style_deviation', value: 0.3 } },
+        item
+      );
+      expect(result.passed).toBe(true);
+    });
+
     test('unknown rule type returns passed with note', async () => {
       const item = await OutputQueue.create({
         workId,
@@ -206,6 +249,70 @@ describe('output-governance', () => {
       );
       expect(result.passed).toBe(true);
       expect(result.note).toBe('Unknown rule type');
+    });
+  });
+
+  describe('processQueue', () => {
+    test('L1 block rule fails item', async () => {
+      await OutputQueue.create({ workId, chapterNumber: 1, status: 'pending', priority: 5, fitnessScore: 0.3 });
+      await OutputValidationRule.create({
+        name: 'min_fitness', level: 'l1', isActive: true,
+        condition: { type: 'min_fitness_score', value: 0.5 },
+        action: 'block',
+      });
+      outputGovernance.rulesCache = null;
+
+      await outputGovernance.processQueue();
+
+      const item = await OutputQueue.findOne({ where: { workId, chapterNumber: 1 } });
+      expect(item.status).toBe('l1_failed');
+    });
+
+    test('L2 validation fails when deviations are severe', async () => {
+      const styleService = require('../src/services/author-fingerprint');
+      styleService.getActiveFingerprints.mockResolvedValueOnce([{ id: 'fp1', name: 'author1' }]);
+      styleService.validateAgainstFingerprint.mockResolvedValueOnce({ passed: false, overallScore: 0.3 });
+
+      await OutputQueue.create({ workId, chapterNumber: 1, status: 'pending', priority: 5, fitnessScore: 0.8 });
+      await OutputValidationRule.create({
+        name: 'min_fitness', level: 'l1', isActive: true,
+        condition: { type: 'min_fitness_score', value: 0.5 },
+        action: 'block',
+      });
+      outputGovernance.rulesCache = null;
+
+      await outputGovernance.processQueue();
+
+      const item = await OutputQueue.findOne({ where: { workId, chapterNumber: 1 } });
+      expect(item.status).toBe('l2_failed');
+    });
+
+    test('item goes to human_reviewing when required', async () => {
+      await OutputQueue.create({ workId, chapterNumber: 10, status: 'pending', priority: 5, fitnessScore: 0.8 });
+      outputGovernance.rulesCache = null;
+
+      await outputGovernance.processQueue();
+
+      const item = await OutputQueue.findOne({ where: { workId, chapterNumber: 10 } });
+      expect(item.status).toBe('human_reviewing');
+    });
+
+    test('releases item when all validations pass', async () => {
+      await OutputQueue.create({ workId, chapterNumber: 3, status: 'pending', priority: 5, fitnessScore: 0.8 });
+      outputGovernance.rulesCache = null;
+
+      await outputGovernance.processQueue();
+
+      const item = await OutputQueue.findOne({ where: { workId, chapterNumber: 3 } });
+      expect(item.status).toBe('released');
+      expect(item.releasedBy).toBe('system');
+    });
+  });
+
+  describe('loadChapterText', () => {
+    test('returns empty string when chapter not found', async () => {
+      const text = await outputGovernance.loadChapterText(workId, 999);
+      expect(text).toBe('');
     });
   });
 });
