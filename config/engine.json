@@ -18,6 +18,26 @@
     "deviationCheckText": 4000,
     "traceInputOutput": 500
   },
+  "inputGovernance": {
+    "enabled": true,
+    "planBeforeWrite": true,
+    "composeContext": true
+  },
+  "truthSystem": {
+    "enabled": true,
+    "autoExtract": true,
+    "deltaOnSummary": true
+  },
+  "authorFingerprint": {
+    "enabled": true,
+    "autoAnalyze": true,
+    "injectIntoPrompt": true
+  },
+  "outputGovernance": {
+    "enabled": true,
+    "autoValidate": true,
+    "requireRelease": true
+  },
   "generation": {
     "defaultStrategy": "pipeline",
     "multivolumeTotalVolumes": 3,

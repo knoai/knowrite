@@ -528,6 +528,68 @@ const OutputValidationRule = sequelize.define('OutputValidationRule', {
   indexes: [{ fields: ['level', 'isActive'] }],
 });
 
+// ==================== Phase 4: 输入治理 ====================
+
+const AuthorIntent = sequelize.define('AuthorIntent', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false, unique: true },
+  longTermVision: { type: DataTypes.TEXT, allowNull: true },
+  tone: { type: DataTypes.STRING, allowNull: true },
+  themes: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+  constraints: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+  mustKeep: { type: DataTypes.TEXT, allowNull: true },
+  mustAvoid: { type: DataTypes.TEXT, allowNull: true },
+  notes: { type: DataTypes.TEXT, allowNull: true },
+}, {
+  tableName: 'author_intents',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [{ fields: ['workId'] }],
+});
+
+const CurrentFocus = sequelize.define('CurrentFocus', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  focusText: { type: DataTypes.TEXT, allowNull: false },
+  targetChapters: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 3 },
+  priority: { type: DataTypes.STRING, defaultValue: 'medium' },
+  expiresAt: { type: DataTypes.DATE, allowNull: true },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+}, {
+  tableName: 'current_focuses',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId'] },
+    { fields: ['workId', 'isActive'] },
+  ],
+});
+
+const ChapterIntent = sequelize.define('ChapterIntent', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  chapterNumber: { type: DataTypes.INTEGER, allowNull: false },
+  mustKeep: { type: DataTypes.TEXT, allowNull: true },
+  mustAvoid: { type: DataTypes.TEXT, allowNull: true },
+  sceneBeats: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+  conflictResolution: { type: DataTypes.TEXT, allowNull: true },
+  emotionalGoal: { type: DataTypes.TEXT, allowNull: true },
+  ruleStack: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+  plannedAt: { type: DataTypes.DATE, allowNull: true },
+  composedAt: { type: DataTypes.DATE, allowNull: true },
+}, {
+  tableName: 'chapter_intents',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'chapterNumber'], unique: true },
+    { fields: ['workId'] },
+  ],
+});
+
 let initialized = false;
 async function initDb() {
   if (initialized) return;
@@ -561,4 +623,7 @@ module.exports = {
   WorkStyleLink,
   OutputQueue,
   OutputValidationRule,
+  AuthorIntent,
+  CurrentFocus,
+  ChapterIntent,
 };

@@ -13,6 +13,7 @@ const { evaluateChapterFitness, saveFitness } = require('./fitness-evaluator');
 const { buildRagContext, indexChapterSummary } = require('./rag-retriever');
 const truthManager = require('./truth-manager');
 const outputGovernance = require('./output-governance');
+const inputGovernance = require('./input-governance');
 
 const engineCfg = require('../../config/engine.json');
 const SUMMARY_WINDOW_SIZE = engineCfg.context.summaryWindowSize;
@@ -503,6 +504,24 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   const isFreeMode = (await getWritingMode(workId)) === 'free';
   const MAX_EDIT_ROUNDS = isFreeMode ? engineCfg.editing.maxEditRoundsFree : engineCfg.editing.maxEditRounds;
 
+  // ===== 输入治理：plan + compose =====
+  let governanceVars = null;
+  if (engineCfg.inputGovernance?.enabled) {
+    try {
+      if (engineCfg.inputGovernance?.planBeforeWrite) {
+        await inputGovernance.planChapter(workId, nextNumber);
+        console.log(`[input-gov] 第${nextNumber}章 plan 完成`);
+      }
+      if (engineCfg.inputGovernance?.composeContext) {
+        await inputGovernance.composeChapter(workId, nextNumber);
+        console.log(`[input-gov] 第${nextNumber}章 compose 完成`);
+      }
+      governanceVars = await inputGovernance.getGovernanceVariables(workId, nextNumber);
+    } catch (err) {
+      console.error(`[input-gov] 第${nextNumber}章 输入治理失败（继续写作）:`, err.message);
+    }
+  }
+
   // 1. 作者：初稿
   if (callbacks.onStepStart) callbacks.onStepStart({ key: `raw_${nextNumber}`, name: `第${nextNumber}章 作者初稿`, model: models.writer });
   const wordVars = await getChapterWordVariables();
@@ -516,6 +535,20 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     ...wordVars,
   });
   if (worldContext) writerPrompt += '\n\n【世界观上下文】\n' + worldContext;
+
+  // 输入治理：注入治理变量到 Writer prompt
+  if (governanceVars && governanceVars.governanceEnabled) {
+    const govLines = [];
+    if (governanceVars.authorLongTermVision) govLines.push(`【长期愿景】${governanceVars.authorLongTermVision}`);
+    if (governanceVars.focusText) govLines.push(`【当前焦点】${governanceVars.focusText}（目标${governanceVars.targetChapters}章内完成）`);
+    if (governanceVars.chapterMustKeep) govLines.push(`【本章必须保留】${governanceVars.chapterMustKeep}`);
+    if (governanceVars.chapterMustAvoid) govLines.push(`【本章必须避免】${governanceVars.chapterMustAvoid}`);
+    if (governanceVars.ruleStackText) govLines.push(`【规则栈】\n${governanceVars.ruleStackText}`);
+    if (govLines.length) {
+      writerPrompt += '\n\n========== 输入治理指令 ==========\n' + govLines.join('\n\n') + '\n========== 输入治理指令结束 ==========';
+    }
+  }
+
   const rawResult = await runStreamChat([{ role: 'user', content: writerPrompt }], await resolveWriterModel(nextNumber, models.writer), {
     onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk(`raw_${nextNumber}`, chunk); }
   }, { workId, agentType: 'writer', promptTemplate: 'writer.md' });
@@ -746,6 +779,24 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
   const worldContext = await getWorldContextForPrompt(workId, nextNumber);
   const isFreeMode = (await getWritingMode(workId)) === 'free';
 
+  // ===== 输入治理：plan + compose =====
+  let governanceVars = null;
+  if (engineCfg.inputGovernance?.enabled) {
+    try {
+      if (engineCfg.inputGovernance?.planBeforeWrite) {
+        await inputGovernance.planChapter(workId, nextNumber);
+        console.log(`[input-gov] 第${nextNumber}章 plan 完成`);
+      }
+      if (engineCfg.inputGovernance?.composeContext) {
+        await inputGovernance.composeChapter(workId, nextNumber);
+        console.log(`[input-gov] 第${nextNumber}章 compose 完成`);
+      }
+      governanceVars = await inputGovernance.getGovernanceVariables(workId, nextNumber);
+    } catch (err) {
+      console.error(`[input-gov] 第${nextNumber}章 输入治理失败（继续写作）:`, err.message);
+    }
+  }
+
   // 生成正文
   if (callbacks.onStepStart) callbacks.onStepStart({ key: `chapter_${nextNumber}`, name: `第${nextNumber}章 正文`, model: models.writer });
   const wordVars = await getChapterWordVariables();
@@ -759,6 +810,20 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
     ...wordVars,
   });
   if (worldContext) chapterPrompt += '\n\n【世界观上下文】\n' + worldContext;
+
+  // 输入治理：注入治理变量
+  if (governanceVars && governanceVars.governanceEnabled) {
+    const govLines = [];
+    if (governanceVars.authorLongTermVision) govLines.push(`【长期愿景】${governanceVars.authorLongTermVision}`);
+    if (governanceVars.focusText) govLines.push(`【当前焦点】${governanceVars.focusText}（目标${governanceVars.targetChapters}章内完成）`);
+    if (governanceVars.chapterMustKeep) govLines.push(`【本章必须保留】${governanceVars.chapterMustKeep}`);
+    if (governanceVars.chapterMustAvoid) govLines.push(`【本章必须避免】${governanceVars.chapterMustAvoid}`);
+    if (governanceVars.ruleStackText) govLines.push(`【规则栈】\n${governanceVars.ruleStackText}`);
+    if (govLines.length) {
+      chapterPrompt += '\n\n========== 输入治理指令 ==========\n' + govLines.join('\n\n') + '\n========== 输入治理指令结束 ==========';
+    }
+  }
+
   const chapterResult = await runStreamChat([{ role: 'user', content: chapterPrompt }], await resolveWriterModel(nextNumber, models.writer), {
     onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk(`chapter_${nextNumber}`, chunk); }
   }, { workId, agentType: 'chapter', promptTemplate: 'chapter.md' });
