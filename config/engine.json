@@ -15,6 +15,7 @@
     "chapterContentPreview": 3000,
     "previousChapterReference": 1500,
     "editDraftPreview": 3000,
+    "editDraftHeadRatio": 0.5,
     "deviationCheckText": 4000,
     "traceInputOutput": 500
   },

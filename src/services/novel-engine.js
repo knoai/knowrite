@@ -33,6 +33,19 @@ async function buildEditHistory(workId, chapterNumber, currentRound) {
   return '\n\n========== 历史评审记录 ==========\n' + histories.join('\n\n') + '\n\n========== 以上为之前各轮的评审意见，供你对比参考 ==========\n';
 }
 
+/**
+ * 构建 editor 审阅用的 draft 预览文本。
+ * 当文本超过截断长度时，采用头尾组合截取，让 editor 看到开头和结尾。
+ */
+function buildEditorDraftPreview(text, maxChars, headRatio = 0.5) {
+  if (!text || text.length <= maxChars) return text;
+  const headChars = Math.floor(maxChars * headRatio);
+  const tailChars = maxChars - headChars - 20; // 预留省略标记长度
+  const head = text.substring(0, headChars);
+  const tail = text.substring(text.length - tailChars);
+  return `${head}\n\n【……中间省略 ${text.length - headChars - tailChars} 字……】\n\n${tail}`;
+}
+
 function parseEditorVerdict(content) {
   const dimensions = [];
   const lines = content.split('\n');
@@ -600,7 +613,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
       reviewDimensions: await buildReviewDimensionsText(style),
       prevFinal: prevFinal ? '\n上一章内容（供参考连贯性）：\n' + prevFinal.substring(0, engineCfg.truncation.previousChapterReference) + '\n' : '',
       roundLabel: round === 1 ? '初稿' : '第' + (round - 1) + '轮修改稿',
-      currentDraft: currentDraft.substring(0, engineCfg.truncation.editDraftPreview),
+      currentDraft: buildEditorDraftPreview(currentDraft, engineCfg.truncation.editDraftPreview, engineCfg.truncation.editDraftHeadRatio || 0.5),
       editHistory,
     });
     if (worldContext) editorPrompt += '\n\n【世界观上下文】\n' + worldContext;
