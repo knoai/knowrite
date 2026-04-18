@@ -9,6 +9,8 @@ const { evolvePrompt, applyCandidate } = require('../services/prompt-evolver');
 const { listPrompts } = require('../services/prompt-loader');
 const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode } = require('../services/settings-store');
 const fileStore = require('../services/file-store');
+const { validateBody } = require('../middleware/validator');
+const { startSchema, continueSchema, importSchema, importOutlineSchema } = require('../schemas/novel');
 
 const WORKS_DIR = path.join(__dirname, '../../works');
 const router = express.Router();
@@ -40,7 +42,7 @@ function sse(res) {
   };
 }
 
-router.post('/start', async (req, res) => {
+router.post('/start', validateBody(startSchema), async (req, res) => {
   const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode } = req.body || {};
   if (!topic || (!style && (!platformStyle || !authorStyle))) {
     return res.status(400).json({ error: '缺少 topic 或风格信息' });
@@ -69,7 +71,7 @@ router.post('/start', async (req, res) => {
   }
 });
 
-router.post('/continue', async (req, res) => {
+router.post('/continue', validateBody(continueSchema), async (req, res) => {
   const { workId, customModels, targetVolume } = req.body || {};
   if (!workId) {
     return res.status(400).json({ error: '缺少 workId' });
@@ -282,7 +284,7 @@ router.get('/works/:workId', async (req, res) => {
 });
 
 // Import & Correction APIs
-router.post('/import', async (req, res) => {
+router.post('/import', validateBody(importSchema), async (req, res) => {
   const { title, content, style, platformStyle, authorStyle } = req.body || {};
   if (!title || !content) {
     return res.status(400).json({ error: '缺少 title 或 content' });
@@ -295,7 +297,7 @@ router.post('/import', async (req, res) => {
   }
 });
 
-router.post('/import-outline', async (req, res) => {
+router.post('/import-outline', validateBody(importOutlineSchema), async (req, res) => {
   const { title, outlineText, style, platformStyle, authorStyle, optimize } = req.body || {};
   if (!title || !outlineText) {
     return res.status(400).json({ error: '缺少 title 或 outlineText' });

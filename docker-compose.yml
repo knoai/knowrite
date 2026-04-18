@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  knowrite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: knowrite
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+    volumes:
+      # 持久化数据：SQLite 数据库、作品文件、日志
+      - knowrite-data:/app/data
+      - knowrite-works:/app/works
+      - knowrite-logs:/app/logs
+      # 配置文件（可选：挂载本地配置覆盖默认配置）
+      - ./config:/app/config:ro
+      # Prompt 模板（可选：挂载本地模板）
+      - ./prompts:/app/prompts:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  knowrite-data:
+  knowrite-works:
+  knowrite-logs:

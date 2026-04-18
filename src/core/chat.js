@@ -1,7 +1,23 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const axiosRetry = require('axios-retry');
 const ProviderFactory = require('../providers/factory');
+
+// 为 axios 配置重试策略（针对 proxy 流式请求）
+axiosRetry(axios, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    // 对网络错误、超时、5xx、429 进行重试
+    return axiosRetry.isNetworkOrIdempotentRequestError(error)
+      || error.response?.status === 429
+      || error.response?.status >= 500;
+  },
+  onRetry: (retryCount, error, requestConfig) => {
+    console.warn(`[chat] 请求重试 ${retryCount}/3: ${error.message} (${requestConfig.url})`);
+  },
+});
 const { getWorkDir } = require('./paths');
 const fileStore = require('../services/file-store');
 const { getModelConfig } = require('../services/settings-store');
