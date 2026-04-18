@@ -173,9 +173,8 @@ jest.mock('./src/models', () => {
   });
 
   const Setting = sequelize.define('Setting', {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    key: { type: DataTypes.STRING, unique: true },
-    value: DataTypes.TEXT,
+    key: { type: DataTypes.STRING, primaryKey: true },
+    value: { type: DataTypes.TEXT, defaultValue: '{}' },
   }, { tableName: 'settings', timestamps: true });
 
   // 基础关联
