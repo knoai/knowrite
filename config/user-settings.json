@@ -944,9 +944,9 @@
     }
   },
   "chapterConfig": {
-    "targetWords": 2000,
-    "minWords": 1800,
-    "maxWords": 2200,
+    "targetWords": 2500,
+    "minWords": 2200,
+    "maxWords": 2800,
     "absoluteMin": 1600,
     "absoluteMax": 2500
   },

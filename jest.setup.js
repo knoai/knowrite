@@ -26,6 +26,7 @@ jest.mock('./src/models', () => {
     strategy: DataTypes.STRING,
     outlineTheme: DataTypes.TEXT,
     outlineDetailed: DataTypes.TEXT,
+    writingMode: DataTypes.STRING,
   }, { tableName: 'works', timestamps: true });
 
   const Chapter = sequelize.define('Chapter', {
