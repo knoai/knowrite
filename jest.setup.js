@@ -34,6 +34,7 @@ jest.mock('./src/models', () => {
     number: DataTypes.INTEGER,
     rawFile: DataTypes.STRING,
     finalFile: DataTypes.STRING,
+    polishFile: DataTypes.STRING,
     chars: DataTypes.INTEGER,
   }, { tableName: 'chapters', timestamps: false });
 
@@ -119,6 +120,13 @@ jest.mock('./src/models', () => {
     chapterNumber: DataTypes.INTEGER,
     status: DataTypes.STRING,
     priority: DataTypes.INTEGER,
+    fitnessScore: DataTypes.FLOAT,
+    enqueuedAt: DataTypes.DATE,
+    l1Result: DataTypes.JSON,
+    l2Result: DataTypes.JSON,
+    humanReview: DataTypes.JSON,
+    releasedAt: DataTypes.DATE,
+    releasedBy: DataTypes.STRING,
   }, { tableName: 'output_queues', timestamps: true });
 
   const OutputValidationRule = sequelize.define('OutputValidationRule', {
@@ -127,7 +135,8 @@ jest.mock('./src/models', () => {
     level: DataTypes.STRING,
     category: DataTypes.STRING,
     condition: DataTypes.JSON,
-    isActive: DataTypes.BOOLEAN,
+    isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+    action: { type: DataTypes.STRING, defaultValue: 'warn' },
   }, { tableName: 'output_validation_rules', timestamps: true });
 
   const AuthorFingerprint = sequelize.define('AuthorFingerprint', {
