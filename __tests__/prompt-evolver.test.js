@@ -73,6 +73,28 @@ describe('prompt-evolver', () => {
       expect(result.diagnosis).toBe('未能自动诊断，可能样本不足');
       expect(result.directions.length).toBeGreaterThan(0);
     });
+
+    test('calls callbacks during analysis', async () => {
+      const { runStreamChat } = require('../src/core/chat');
+      runStreamChat.mockResolvedValue({ content: '{"diagnosis":"x","directions":["y"]}', chars: 10, durationMs: 100 });
+      const onStepStart = jest.fn();
+      const onStepEnd = jest.fn();
+      const onChunk = jest.fn();
+      await promptEvolver.analyzeFailures('writer', [], 'm', { onStepStart, onStepEnd, onChunk });
+      expect(onStepStart).toHaveBeenCalled();
+      expect(onStepEnd).toHaveBeenCalled();
+    });
+
+    test('falls back to regex extraction on JSON parse failure', async () => {
+      const { runStreamChat } = require('../src/core/chat');
+      runStreamChat.mockResolvedValue({
+        content: 'some text {"diagnosis":"regex","directions":["d1"]} more text',
+        chars: 50,
+        durationMs: 200,
+      });
+      const result = await promptEvolver.analyzeFailures('writer', [], 'mock-model', {});
+      expect(result.diagnosis).toBe('regex');
+    });
   });
 
   describe('generateVariants', () => {
@@ -115,6 +137,16 @@ describe('prompt-evolver', () => {
       const variants = await promptEvolver.generateVariants('writer', diagnosis, 2, 'mock-model', {});
       expect(variants.length).toBe(1);
     });
+
+    test('calls callbacks during generation', async () => {
+      const { runStreamChat } = require('../src/core/chat');
+      runStreamChat.mockResolvedValue({ content: '<!-- variant:1 -->A', chars: 10, durationMs: 100 });
+      const onStepStart = jest.fn();
+      const onStepEnd = jest.fn();
+      await promptEvolver.generateVariants('writer', { diagnosis: 'x', directions: ['y'] }, 1, 'm', { onStepStart, onStepEnd });
+      expect(onStepStart).toHaveBeenCalled();
+      expect(onStepEnd).toHaveBeenCalled();
+    });
   });
 
   describe('evaluateVariant', () => {
@@ -153,6 +185,25 @@ describe('prompt-evolver', () => {
       const result = await promptEvolver.evaluateVariant('template', dataset, 'mock-model', {});
       expect(result.avgFitness).toBe(0);
     });
+
+    test('calls callbacks during evaluation', async () => {
+      const { runStreamChat } = require('../src/core/chat');
+      runStreamChat.mockImplementation(async (_messages, _config, options) => {
+        if (options?.onChunk) options.onChunk('chunk');
+        return { content: '{"predicted_score":0.8}', chars: 10, durationMs: 100 };
+      });
+      const onChunk = jest.fn();
+      const result = await promptEvolver.evaluateVariant('t', [{ fitness: 0.3, trace: {} }], 'm', { onChunk });
+      expect(result.avgFitness).toBeGreaterThan(0);
+      expect(onChunk).toHaveBeenCalled();
+    });
+
+    test('handles predicted_score that is not a number', async () => {
+      const { runStreamChat } = require('../src/core/chat');
+      runStreamChat.mockResolvedValue({ content: '{"predicted_score":"high"}', chars: 10, durationMs: 100 });
+      const result = await promptEvolver.evaluateVariant('t', [{ fitness: 0.3, trace: {} }], 'm', {});
+      expect(result.avgFitness).toBe(0.5);
+    });
   });
 
   describe('evolvePrompt', () => {
@@ -160,6 +211,68 @@ describe('prompt-evolver', () => {
       const result = await promptEvolver.evolvePrompt('writer', ['nonexistent-work-xyz']);
       expect(result.success).toBe(false);
       expect(result.reason).toContain('低分样本不足');
+    });
+
+    test('returns failure when low fitness samples are insufficient', async () => {
+      const workDir = path.join(__dirname, '../works', 'evo-test-high');
+      fs.mkdirSync(path.join(workDir, 'traces'), { recursive: true });
+      fs.writeFileSync(
+        path.join(workDir, 'chapter_1_fitness.json'),
+        JSON.stringify({ score: 0.9, breakdown: {} }),
+        'utf-8'
+      );
+      fs.writeFileSync(
+        path.join(workDir, 'traces', 'writer.jsonl'),
+        JSON.stringify({ inputPreview: 'in', outputPreview: 'out' }) + '\n',
+        'utf-8'
+      );
+
+      const result = await promptEvolver.evolvePrompt('writer', ['evo-test-high']);
+      expect(result.success).toBe(false);
+      expect(result.baselineFitness).toBeGreaterThan(0);
+
+      fs.rmSync(workDir, { recursive: true, force: true });
+    });
+
+    test('runs full evolution when low fitness samples exist', async () => {
+      const workDir = path.join(__dirname, '../works', 'evo-test-low');
+      fs.mkdirSync(path.join(workDir, 'traces'), { recursive: true });
+      for (let i = 1; i <= 3; i++) {
+        fs.writeFileSync(
+          path.join(workDir, `chapter_${i}_fitness.json`),
+          JSON.stringify({ score: 0.3, breakdown: { wordScore: 0.4 } }),
+          'utf-8'
+        );
+      }
+      fs.writeFileSync(
+        path.join(workDir, 'traces', 'writer.jsonl'),
+        JSON.stringify({ inputPreview: 'in', outputPreview: 'out' }) + '\n'.repeat(3),
+        'utf-8'
+      );
+
+      const { runStreamChat } = require('../src/core/chat');
+      runStreamChat
+        .mockResolvedValueOnce({
+          content: '{"diagnosis":"weak","directions":["fix1"]}',
+          chars: 50, durationMs: 100,
+        })
+        .mockResolvedValueOnce({
+          content: '<!-- variant:1 -->improved template',
+          chars: 50, durationMs: 100,
+        })
+        .mockResolvedValueOnce({
+          content: '{"predicted_score":0.9}',
+          chars: 20, durationMs: 50,
+        })
+        .mockResolvedValueOnce({
+          content: '{"predicted_score":0.3}',
+          chars: 20, durationMs: 50,
+        });
+
+      const result = await promptEvolver.evolvePrompt('writer', ['evo-test-low'], { fitnessThreshold: 0.5 });
+      expect(result.reportPath).toBeDefined();
+
+      fs.rmSync(workDir, { recursive: true, force: true });
     });
   });
 
