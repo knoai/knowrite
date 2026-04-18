@@ -3,6 +3,8 @@
  */
 const request = require('supertest');
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
 jest.mock('../../src/services/novel-engine', () => ({
   listWorks: jest.fn().mockResolvedValue([{ workId: 'w1', topic: 'Test' }]),
@@ -80,11 +82,18 @@ const router = require('../../src/routes/novel');
 describe('novel routes (non-SSE)', () => {
   let app;
 
+  const testWorkDir = '/tmp/works/test';
+
   beforeEach(() => {
+    fs.mkdirSync(testWorkDir, { recursive: true });
     app = express();
     app.use(express.json());
     app.use('/api/novel', router);
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    try { fs.rmSync(testWorkDir, { recursive: true, force: true }); } catch {}
   });
 
   // ===== Works =====

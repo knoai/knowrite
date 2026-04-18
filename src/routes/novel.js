@@ -10,6 +10,7 @@ const { evolvePrompt, applyCandidate } = require('../services/prompt-evolver');
 const { listPrompts } = require('../services/prompt-loader');
 const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode } = require('../services/settings-store');
 const fileStore = require('../services/file-store');
+const { readFile } = fileStore;
 const { validateBody } = require('../middleware/validator');
 const { startSchema, continueSchema, importSchema, importOutlineSchema } = require('../schemas/novel');
 
