@@ -2,14 +2,13 @@ const express = require('express');
 const router = express.Router();
 const styleService = require('../services/author-fingerprint');
 const { AuthorFingerprint, WorkStyleLink } = require('../models');
+const { validateBody } = require('../middleware/validator');
+const { analyzeFingerprintSchema, importStyleSchema, validateStyleSchema } = require('../schemas/routes');
 
 // POST /api/style/analyze
-router.post('/analyze', async (req, res) => {
+router.post('/analyze', validateBody(analyzeFingerprintSchema), async (req, res) => {
   try {
-    const { text, name, description } = req.body;
-    if (!text || !name) {
-      return res.status(400).json({ error: 'text and name are required' });
-    }
+    const { text, name, description } = req.validatedBody;
     const fingerprint = await styleService.analyzeFullFingerprint(text, name, description);
     res.json({ success: true, fingerprint });
   } catch (err) {
@@ -28,7 +27,7 @@ router.get('/fingerprints', async (req, res) => {
 });
 
 // POST /api/style/import/:workId
-router.post('/import/:workId', async (req, res) => {
+router.post('/import/:workId', validateBody(importStyleSchema), async (req, res) => {
   try {
     const { fingerprintId, priority } = req.body;
     const link = await styleService.importStyle(fingerprintId, req.params.workId, priority);
@@ -62,7 +61,7 @@ router.delete('/work/:workId/:fingerprintId', async (req, res) => {
 });
 
 // POST /api/style/validate/:workId
-router.post('/validate/:workId', async (req, res) => {
+router.post('/validate/:workId', validateBody(validateStyleSchema), async (req, res) => {
   try {
     const { chapterText, fingerprintId } = req.body;
     const result = await styleService.validateAgainstFingerprint(req.params.workId, chapterText, fingerprintId);

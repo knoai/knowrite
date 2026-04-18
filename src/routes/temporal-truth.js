@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const truthManager = require('../services/truth-manager');
 const { TruthState, TruthHook, TruthResource } = require('../models');
+const { validateBody } = require('../middleware/validator');
+const { createHookSchema, updateHookSchema, createResourceSchema, updateResourceSchema } = require('../schemas/routes');
 
 // GET /api/truth/state/:workId
 router.get('/state/:workId', async (req, res) => {
@@ -39,7 +41,7 @@ router.get('/hooks/:workId', async (req, res) => {
 });
 
 // POST /api/truth/hooks/:workId
-router.post('/hooks/:workId', async (req, res) => {
+router.post('/hooks/:workId', validateBody(createHookSchema), async (req, res) => {
   try {
     const hook = await TruthHook.create({
       workId: req.params.workId,
@@ -54,7 +56,7 @@ router.post('/hooks/:workId', async (req, res) => {
 });
 
 // PUT /api/truth/hooks/:workId/:hookId
-router.put('/hooks/:workId/:hookId', async (req, res) => {
+router.put('/hooks/:workId/:hookId', validateBody(updateHookSchema), async (req, res) => {
   try {
     await TruthHook.update(req.body, { where: { workId: req.params.workId, hookId: req.params.hookId } });
     const hook = await TruthHook.findOne({ where: { hookId: req.params.hookId } });
@@ -78,7 +80,7 @@ router.get('/resources/:workId', async (req, res) => {
 });
 
 // POST /api/truth/resources/:workId
-router.post('/resources/:workId', async (req, res) => {
+router.post('/resources/:workId', validateBody(createResourceSchema), async (req, res) => {
   try {
     const resource = await TruthResource.create({
       workId: req.params.workId,
@@ -92,7 +94,7 @@ router.post('/resources/:workId', async (req, res) => {
 });
 
 // PUT /api/truth/resources/:workId/:resourceId
-router.put('/resources/:workId/:resourceId', async (req, res) => {
+router.put('/resources/:workId/:resourceId', validateBody(updateResourceSchema), async (req, res) => {
   try {
     await TruthResource.update(req.body, { where: { id: req.params.resourceId } });
     const resource = await TruthResource.findByPk(req.params.resourceId);

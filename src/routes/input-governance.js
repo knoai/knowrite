@@ -5,6 +5,8 @@
 const express = require('express');
 const inputGovernance = require('../services/input-governance');
 const { AuthorIntent, CurrentFocus, ChapterIntent } = require('../models');
+const { validateBody } = require('../middleware/validator');
+const { authorIntentSchema, currentFocusSchema, updateFocusSchema, chapterIntentSchema } = require('../schemas/routes');
 
 const router = express.Router();
 
@@ -23,7 +25,7 @@ router.get('/author-intent/:workId', async (req, res) => {
 });
 
 // PUT /api/input-governance/author-intent/:workId
-router.put('/author-intent/:workId', async (req, res) => {
+router.put('/author-intent/:workId', validateBody(authorIntentSchema), async (req, res) => {
   try {
     const data = {
       workId: req.params.workId,
@@ -55,7 +57,7 @@ router.get('/current-focus/:workId', async (req, res) => {
 });
 
 // POST /api/input-governance/current-focus/:workId
-router.post('/current-focus/:workId', async (req, res) => {
+router.post('/current-focus/:workId', validateBody(currentFocusSchema), async (req, res) => {
   try {
     const focus = await CurrentFocus.create({
       workId: req.params.workId,
@@ -69,7 +71,7 @@ router.post('/current-focus/:workId', async (req, res) => {
 });
 
 // PUT /api/input-governance/current-focus/:focusId
-router.put('/current-focus/:focusId', async (req, res) => {
+router.put('/current-focus/:focusId', validateBody(updateFocusSchema), async (req, res) => {
   try {
     const focus = await CurrentFocus.findByPk(req.params.focusId);
     if (!focus) return res.status(404).json({ error: 'Not found' });
@@ -111,7 +113,7 @@ router.get('/chapter-intent/:workId/:chapterNumber', async (req, res) => {
 });
 
 // PUT /api/input-governance/chapter-intent/:workId/:chapterNumber
-router.put('/chapter-intent/:workId/:chapterNumber', async (req, res) => {
+router.put('/chapter-intent/:workId/:chapterNumber', validateBody(chapterIntentSchema), async (req, res) => {
   try {
     const data = {
       workId: req.params.workId,
