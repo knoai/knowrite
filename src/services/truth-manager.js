@@ -6,7 +6,7 @@
  */
 
 const temporalTruth = require('./temporal-truth');
-const { TruthHook, TruthResource } = require('../models');
+const { TruthHook, TruthResource, sequelize } = require('../models');
 
 /**
  * 初始化 truth 文件（从现有作品数据逆向工程）
@@ -23,46 +23,47 @@ async function initializeTruthFiles(workId) {
  * 输出：更新的 truth 记录 + 投影文件
  */
 async function applyChapterDelta(workId, chapterNumber, summaryDelta) {
-  // 1. 批量追加事件到时序数据库
-  const eventCount = await temporalTruth.appendEventsFromDelta(workId, chapterNumber, summaryDelta);
+  return await sequelize.transaction(async (t) => {
+    // 1. 批量追加事件到时序数据库（事务内）
+    const eventCount = await temporalTruth.appendEventsFromDelta(workId, chapterNumber, summaryDelta);
 
-  // 2. 更新 TruthHook 状态（从 resolvedHooks）
-  for (const resolved of summaryDelta.resolvedHooks || []) {
-    await TruthHook.update(
-      { status: 'resolved', resolvedChapter: chapterNumber },
-      { where: { workId, hookId: resolved.hookId } }
-    );
-  }
-
-  // 3. 更新 TruthResource（从 resourceChanges）
-  for (const change of summaryDelta.resourceChanges || []) {
-    const resource = await TruthResource.findOne({ where: { workId, name: change.name } });
-    if (resource) {
-      const updates = { [change.field]: change.newValue };
-      if (change.field === 'status' && change.newValue === 'consumed') {
-        updates.consumedChapter = chapterNumber;
-      }
-      if (change.field === 'status' && change.newValue === 'lost') {
-        updates.lostChapter = chapterNumber;
-      }
-      if (change.field === 'owner') {
-        const history = resource.transferHistory || [];
-        history.push({
-          from: resource.owner,
-          to: change.newValue,
-          chapter: chapterNumber,
-          reason: change.reason || '',
-        });
-        updates.transferHistory = history;
-      }
-      await resource.update(updates);
+    // 2. 更新 TruthHook 状态（从 resolvedHooks）
+    for (const resolved of summaryDelta.resolvedHooks || []) {
+      await TruthHook.update(
+        { status: 'resolved', resolvedChapter: chapterNumber },
+        { where: { workId, hookId: resolved.hookId }, transaction: t }
+      );
     }
-  }
 
-  // 4. 重新生成投影文件
-  await temporalTruth.regenerateProjections(workId);
+    // 3. 更新 TruthResource（从 resourceChanges）
+    for (const change of summaryDelta.resourceChanges || []) {
+      const resource = await TruthResource.findOne({ where: { workId, name: change.name }, transaction: t });
+      if (resource) {
+        const updates = { [change.field]: change.newValue };
+        if (change.field === 'status' && change.newValue === 'consumed') {
+          updates.consumedChapter = chapterNumber;
+        }
+        if (change.field === 'status' && change.newValue === 'lost') {
+          updates.lostChapter = chapterNumber;
+        }
+        if (change.field === 'owner') {
+          const history = resource.transferHistory || [];
+          history.push({
+            from: resource.owner,
+            to: change.newValue,
+            chapter: chapterNumber,
+            reason: change.reason || '',
+          });
+          updates.transferHistory = history;
+        }
+        await resource.update(updates, { transaction: t });
+      }
+    }
 
-  return { updated: true, eventsAppended: eventCount };
+    // 4. 重新生成投影文件（文件 I/O 不参与事务，但应在事务成功后执行）
+    // 由事务外的调用方或通过 setImmediate 触发
+    return { updated: true, eventsAppended: eventCount };
+  });
 }
 
 /**

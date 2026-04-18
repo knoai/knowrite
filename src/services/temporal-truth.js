@@ -12,7 +12,7 @@
  */
 
 const { Op } = require('sequelize');
-const { TruthEvent, TruthState, TruthHook, TruthResource, Character, Work } = require('../models');
+const { TruthEvent, TruthState, TruthHook, TruthResource, Character, Work, sequelize } = require('../models');
 const fileStore = require('./file-store');
 const { getWorkDir } = require('../core/paths');
 
@@ -21,24 +21,28 @@ class TemporalTruthService {
   /**
    * 追加事件（唯一写入入口）
    */
-  async appendEvent(event) {
+  async appendEvent(event, options = {}) {
+    const { transaction } = options;
     const lastEvent = await TruthEvent.findOne({
       where: { workId: event.workId, chapterNumber: event.chapterNumber },
       order: [['eventSequence', 'DESC']],
+      transaction,
     });
     const nextSequence = (lastEvent?.eventSequence || 0) + 1;
 
     const record = await TruthEvent.create({
       ...event,
       eventSequence: nextSequence,
-    });
+    }, { transaction });
 
-    // 异步触发物化视图更新
-    setImmediate(() => {
-      this.materializeState(event.workId, event.chapterNumber).catch((err) => {
-        console.error('[temporal-truth] materializeState failed:', err.message);
+    // 事务内不触发异步物化，由调用方统一处理
+    if (!transaction) {
+      setImmediate(() => {
+        this.materializeState(event.workId, event.chapterNumber).catch((err) => {
+          console.error('[temporal-truth] materializeState failed:', err.message);
+        });
       });
-    });
+    }
 
     return record;
   }
@@ -155,8 +159,19 @@ class TemporalTruthService {
       });
     }
 
-    for (const event of events) {
-      await this.appendEvent(event);
+    // 批量事件在事务中创建，保证原子性
+    if (events.length > 0) {
+      await sequelize.transaction(async (t) => {
+        for (const event of events) {
+          await this.appendEvent(event, { transaction: t });
+        }
+      });
+      // 事务提交后统一触发物化视图更新
+      setImmediate(() => {
+        this.materializeState(workId, chapterNumber).catch((err) => {
+          console.error('[temporal-truth] materializeState failed:', err.message);
+        });
+      });
     }
 
     return events.length;

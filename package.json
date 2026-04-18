@@ -7,7 +7,9 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "chat": "node examples/chat-cli.js",
-    "novel": "node examples/novel-cli.js"
+    "novel": "node examples/novel-cli.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch"
   },
   "keywords": [
     "agent",
@@ -29,6 +31,8 @@
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
   }
 }

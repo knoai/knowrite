@@ -10,6 +10,7 @@ const { initDb, WorkFile } = require('../models');
 const CACHE_MAX_SIZE = 200;
 const CACHE_TTL_MS = 30_000;
 const cache = new Map();
+const accessOrder = new Map(); // 记录访问时间戳，用于 LRU 淘汰
 
 function cacheKey(workId, filename) {
   return `${workId}::${filename}`;
@@ -21,18 +22,37 @@ function getCached(workId, filename) {
   if (!entry) return undefined;
   if (Date.now() - entry.ts > CACHE_TTL_MS) {
     cache.delete(key);
+    accessOrder.delete(key);
     return undefined;
   }
+  // 更新访问时间（真正的 LRU）
+  accessOrder.set(key, Date.now());
   return entry.value;
+}
+
+function evictLRU() {
+  if (accessOrder.size === 0) return;
+  let oldestKey = null;
+  let oldestTime = Infinity;
+  for (const [key, time] of accessOrder) {
+    if (time < oldestTime) {
+      oldestTime = time;
+      oldestKey = key;
+    }
+  }
+  if (oldestKey) {
+    cache.delete(oldestKey);
+    accessOrder.delete(oldestKey);
+  }
 }
 
 function setCached(workId, filename, value) {
   const key = cacheKey(workId, filename);
   if (cache.size >= CACHE_MAX_SIZE && !cache.has(key)) {
-    const firstKey = cache.keys().next().value;
-    cache.delete(firstKey);
+    evictLRU();
   }
   cache.set(key, { value, ts: Date.now() });
+  accessOrder.set(key, Date.now());
 }
 
 function invalidateCache(workId, filename) {

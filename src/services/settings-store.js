@@ -1,24 +1,81 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { initDb, Setting } = require('../models');
 
-// API Key 简易加密：base64 编码存储，避免明文暴露
+function getEncryptionKey() {
+  return process.env.ENCRYPTION_KEY || '';
+}
+
+function deriveKey() {
+  const key = getEncryptionKey();
+  if (key.length >= 32) {
+    return Buffer.from(key.slice(0, 32));
+  }
+  // 如果密钥不足 32 字节，用 SHA-256 派生固定长度密钥
+  return crypto.createHash('sha256').update(key || 'knowrite-default-key').digest();
+}
+
+/**
+ * AES-256-GCM 加密
+ * 格式: aes:<iv_hex>:<auth_tag_hex>:<ciphertext_hex>
+ * 如果 ENCRYPTION_KEY 未设置，回退到 base64 编码（向后兼容）
+ */
 function encryptKey(key) {
   if (!key || typeof key !== 'string') return '';
-  if (key.startsWith('enc:')) return key; // 已经是加密态
+  if (key.startsWith('aes:') || key.startsWith('enc:')) return key; // 已经是加密态
+
+  if (!getEncryptionKey()) {
+    // 向后兼容：未设置加密密钥时，回退到 base64 编码
+    try {
+      return 'enc:' + Buffer.from(key, 'utf-8').toString('base64');
+    } catch {
+      return key;
+    }
+  }
+
   try {
-    return 'enc:' + Buffer.from(key, 'utf-8').toString('base64');
-  } catch {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-gcm', deriveKey(), iv);
+    let encrypted = cipher.update(key, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag();
+    return 'aes:' + iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+  } catch (err) {
+    console.error('[settings-store] AES 加密失败:', err.message);
     return key;
   }
 }
 
+/**
+ * AES-256-GCM 解密
+ * 支持 aes:（新格式）和 enc:（旧格式 base64）
+ */
 function decryptKey(encKey) {
   if (!encKey || typeof encKey !== 'string') return '';
-  if (!encKey.startsWith('enc:')) return encKey; // 兼容旧数据
+  if (!encKey.startsWith('aes:') && !encKey.startsWith('enc:')) return encKey; // 明文
+
+  // 旧格式 base64 解码（向后兼容）
+  if (encKey.startsWith('enc:')) {
+    try {
+      return Buffer.from(encKey.slice(4), 'base64').toString('utf-8');
+    } catch {
+      return encKey;
+    }
+  }
+
+  // 新格式 AES-256-GCM 解密
   try {
-    return Buffer.from(encKey.slice(4), 'base64').toString('utf-8');
-  } catch {
+    const parts = encKey.slice(4).split(':');
+    if (parts.length !== 3) return encKey;
+    const [ivHex, authTagHex, ciphertext] = parts;
+    const decipher = crypto.createDecipheriv('aes-256-gcm', deriveKey(), Buffer.from(ivHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+    let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    console.error('[settings-store] AES 解密失败:', err.message);
     return encKey;
   }
 }
@@ -349,4 +406,6 @@ module.exports = {
   saveChapterConfig,
   getWritingMode,
   saveWritingMode,
+  encryptKey,
+  decryptKey,
 };

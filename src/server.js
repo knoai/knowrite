@@ -288,7 +288,7 @@ const PORT = process.env.PORT || netCfg.server.port;
     console.error('[Server] 套路模版初始化异常:', err.message);
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[Server] knowrite 服务已启动: http://localhost:${PORT}`);
     console.log(`[Server] Proxy: ${PROXY_BASE}`);
     console.log(`[Server] 小说创作工作台: http://localhost:${PORT}/`);
@@ -298,4 +298,24 @@ const PORT = process.env.PORT || netCfg.server.port;
       console.log(`[Server] ⚠️  认证未启用，如需启用请设置 AUTH_TOKEN 环境变量`);
     }
   });
+
+  // 优雅关闭
+  async function gracefulShutdown(signal) {
+    console.log(`[Server] 收到 ${signal}，开始优雅关闭...`);
+    server.close(() => {
+      console.log('[Server] HTTP 服务已关闭');
+    });
+    try {
+      const { sequelize } = require('./models');
+      await sequelize.close();
+      console.log('[Server] 数据库连接已关闭');
+    } catch (err) {
+      console.error('[Server] 关闭数据库连接失败:', err.message);
+    }
+    console.log('[Server] 优雅关闭完成');
+    process.exit(0);
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 })();

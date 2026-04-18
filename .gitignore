@@ -27,3 +27,6 @@ temp/
 
 # npm cache
 .npm-cache/
+
+# Test coverage
+coverage/
