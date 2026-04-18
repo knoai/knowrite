@@ -282,6 +282,8 @@ jest.mock('./src/models', () => {
 
   // 基础关联
   Work.hasMany(Chapter, { foreignKey: 'workId' });
+  PlotLine.hasMany(PlotNode, { as: 'nodes', foreignKey: 'plotLineId' });
+  PlotNode.belongsTo(PlotLine, { as: 'plotLine', foreignKey: 'plotLineId' });
 
   let initialized = false;
   async function initDb() {
