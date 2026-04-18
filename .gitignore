@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# Build output (if any)
+dist/
+
+# Data (user-generated)
+data/*.db
+works/*/
+!works/.gitkeep
+
+# Temporary
+tmp/
+temp/
