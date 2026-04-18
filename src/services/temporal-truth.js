@@ -733,6 +733,9 @@ class TemporalTruthService {
         case 'char_location_change':
           this.updateCharacterState(state, event.subjectId, 'location', event.payload.to);
           break;
+        case 'char_status_change':
+          this.updateCharacterState(state, event.subjectId, 'status', event.payload.to);
+          break;
         case 'char_health_change':
           this.updateCharacterState(state, event.subjectId, 'health', event.payload.to);
           break;

@@ -70,6 +70,10 @@ jest.mock('./src/models', () => {
     hookId: DataTypes.STRING,
     status: DataTypes.STRING,
     resolvedChapter: DataTypes.INTEGER,
+    importance: { type: DataTypes.INTEGER, defaultValue: 5 },
+    createdChapter: DataTypes.INTEGER,
+    description: DataTypes.TEXT,
+    targetChapter: DataTypes.INTEGER,
   }, { tableName: 'truth_hooks', timestamps: true });
 
   const TruthResource = sequelize.define('TruthResource', {
@@ -78,7 +82,10 @@ jest.mock('./src/models', () => {
     name: DataTypes.STRING,
     owner: DataTypes.STRING,
     quantity: DataTypes.INTEGER,
+    status: { type: DataTypes.STRING, defaultValue: 'active' },
     transferHistory: DataTypes.JSON,
+    consumedChapter: DataTypes.INTEGER,
+    lostChapter: DataTypes.INTEGER,
   }, { tableName: 'truth_resources', timestamps: true });
 
   const AuthorIntent = sequelize.define('AuthorIntent', {
