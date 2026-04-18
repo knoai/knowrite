@@ -184,6 +184,22 @@ describe('world-context routes', () => {
       expect(res.body.item.name).toBe('支线');
     });
 
+    it('should update plot line', async () => {
+      const line = await PlotLine.create({ workId, name: 'Old', type: '主线' });
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/plot-lines/${line.id}`)
+        .send({ name: 'Updated' });
+      expect(res.status).toBe(200);
+      expect(res.body.item.name).toBe('Updated');
+    });
+
+    it('should return 404 when updating missing plot line', async () => {
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/plot-lines/999`)
+        .send({ name: 'X' });
+      expect(res.status).toBe(404);
+    });
+
     it('should delete plot line and its nodes', async () => {
       const line = await PlotLine.create({ workId, name: 'ToDelete' });
       await PlotNode.create({ workId, plotLineId: line.id, title: 'N1' });
@@ -218,6 +234,33 @@ describe('world-context routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.item.title).toBe('New Node');
     });
+
+    it('should update node', async () => {
+      const line = await PlotLine.create({ workId, name: 'L1' });
+      const node = await PlotNode.create({ workId, plotLineId: line.id, title: 'Old', position: 1 });
+
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/plot-lines/${line.id}/nodes/${node.id}`)
+        .send({ title: 'Updated' });
+      expect(res.status).toBe(200);
+      expect(res.body.item.title).toBe('Updated');
+    });
+
+    it('should return 404 when updating missing node', async () => {
+      const line = await PlotLine.create({ workId, name: 'L1' });
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/plot-lines/${line.id}/nodes/999`)
+        .send({ title: 'X' });
+      expect(res.status).toBe(404);
+    });
+
+    it('should delete node', async () => {
+      const line = await PlotLine.create({ workId, name: 'L1' });
+      const node = await PlotNode.create({ workId, plotLineId: line.id, title: 'N1', position: 1 });
+
+      const res = await request(app).delete(`/api/novel/works/${workId}/plot-lines/${line.id}/nodes/${node.id}`);
+      expect(res.status).toBe(200);
+    });
   });
 
   // ===================== MapRegion =====================
@@ -237,6 +280,22 @@ describe('world-context routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.item.name).toBe('上海');
+    });
+
+    it('should update region', async () => {
+      const region = await MapRegion.create({ workId, name: 'Old', regionType: '城市' });
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/map-regions/${region.id}`)
+        .send({ name: 'Updated' });
+      expect(res.status).toBe(200);
+      expect(res.body.item.name).toBe('Updated');
+    });
+
+    it('should return 404 when updating missing region', async () => {
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/map-regions/999`)
+        .send({ name: 'X' });
+      expect(res.status).toBe(404);
     });
 
     it('should delete region and cleanup connections', async () => {
@@ -268,6 +327,28 @@ describe('world-context routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.item.connType).toBe('传送阵');
+    });
+
+    it('should update connection', async () => {
+      const conn = await MapConnection.create({ workId, fromRegionId: 1, toRegionId: 2, connType: '路' });
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/map-connections/${conn.id}`)
+        .send({ connType: '桥' });
+      expect(res.status).toBe(200);
+      expect(res.body.item.connType).toBe('桥');
+    });
+
+    it('should return 404 when updating missing connection', async () => {
+      const res = await request(app)
+        .put(`/api/novel/works/${workId}/map-connections/999`)
+        .send({ connType: 'X' });
+      expect(res.status).toBe(404);
+    });
+
+    it('should delete connection', async () => {
+      const conn = await MapConnection.create({ workId, fromRegionId: 1, toRegionId: 2, connType: '路' });
+      const res = await request(app).delete(`/api/novel/works/${workId}/map-connections/${conn.id}`);
+      expect(res.status).toBe(200);
     });
   });
 
