@@ -182,4 +182,43 @@ describe('rag-retriever', () => {
     await ragRetriever.indexWorldLore(workId, null);
     expect(saveEmbedding).not.toHaveBeenCalled();
   });
+
+  test('retrieveRelevantSummaries catches errors gracefully', async () => {
+    const { generateEmbedding } = require('../src/services/vector-store');
+    generateEmbedding.mockRejectedValueOnce(new Error('embedding failed'));
+    const results = await ragRetriever.retrieveRelevantSummaries(workId, 'outline', 1);
+    expect(results).toEqual([]);
+  });
+
+  test('retrieveRelevantCharacters catches errors gracefully', async () => {
+    const { generateEmbedding } = require('../src/services/vector-store');
+    generateEmbedding.mockRejectedValueOnce(new Error('embedding failed'));
+    const results = await ragRetriever.retrieveRelevantCharacters(workId, 'outline');
+    expect(results).toEqual([]);
+  });
+
+  test('retrieveRelevantLore catches errors gracefully', async () => {
+    const { generateEmbedding } = require('../src/services/vector-store');
+    generateEmbedding.mockRejectedValueOnce(new Error('embedding failed'));
+    const results = await ragRetriever.retrieveRelevantLore(workId, 'outline');
+    expect(results).toEqual([]);
+  });
+
+  test('indexChapterSummary catches errors gracefully', async () => {
+    const { generateEmbedding } = require('../src/services/vector-store');
+    generateEmbedding.mockRejectedValueOnce(new Error('embedding failed'));
+    await expect(ragRetriever.indexChapterSummary(workId, 1, 'summary', 'model')).resolves.toBeUndefined();
+  });
+
+  test('indexCharacter catches errors gracefully', async () => {
+    const { generateEmbedding } = require('../src/services/vector-store');
+    generateEmbedding.mockRejectedValueOnce(new Error('embedding failed'));
+    await expect(ragRetriever.indexCharacter(workId, { name: 'hero' })).resolves.toBeUndefined();
+  });
+
+  test('indexWorldLore catches errors gracefully', async () => {
+    const { generateEmbedding } = require('../src/services/vector-store');
+    generateEmbedding.mockRejectedValueOnce(new Error('embedding failed'));
+    await expect(ragRetriever.indexWorldLore(workId, { title: 'x' })).resolves.toBeUndefined();
+  });
 });
