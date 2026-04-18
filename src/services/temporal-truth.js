@@ -768,6 +768,11 @@ class TemporalTruthService {
           );
           break;
         default:
+          // 通用 world_*_change 处理（如 world_political_change）
+          if (event.eventType.startsWith('world_') && event.eventType.endsWith('_change')) {
+            const field = event.eventType.replace('world_', '').replace('_change', '');
+            state.worldState[field] = event.payload.to;
+          }
           break;
       }
     }
