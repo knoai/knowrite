@@ -84,4 +84,64 @@ describe('truth-manager', () => {
     expect(temporalTruth.traceChanges).toHaveBeenCalledWith(workId, 'character', 'hero', 1, 5);
     expect(trace[0].chapter).toBe(1);
   });
+
+  test('applyChapterDelta marks resource as consumed', async () => {
+    await TruthResource.create({ workId, name: 'potion', owner: 'hero', status: 'active' });
+    const delta = { resourceChanges: [{ name: 'potion', field: 'status', oldValue: 'active', newValue: 'consumed' }] };
+    await truthManager.applyChapterDelta(workId, 3, delta);
+    const resource = await TruthResource.findOne({ where: { workId, name: 'potion' } });
+    expect(resource.status).toBe('consumed');
+    expect(resource.consumedChapter).toBe(3);
+  });
+
+  test('applyChapterDelta marks resource as lost', async () => {
+    await TruthResource.create({ workId, name: 'map', owner: 'hero', status: 'active' });
+    const delta = { resourceChanges: [{ name: 'map', field: 'status', oldValue: 'active', newValue: 'lost' }] };
+    await truthManager.applyChapterDelta(workId, 4, delta);
+    const resource = await TruthResource.findOne({ where: { workId, name: 'map' } });
+    expect(resource.status).toBe('lost');
+    expect(resource.lostChapter).toBe(4);
+  });
+
+  test('getCharacterStateAt delegates to temporal-truth', async () => {
+    const temporalTruth = require('../src/services/temporal-truth');
+    await truthManager.getCharacterStateAt(workId, 'hero', 5);
+    expect(temporalTruth.getCharacterStateAt).toHaveBeenCalledWith(workId, 'hero', 5);
+  });
+
+  test('getOpenHooks delegates to temporal-truth', async () => {
+    const temporalTruth = require('../src/services/temporal-truth');
+    await truthManager.getOpenHooks(workId);
+    expect(temporalTruth.getOpenHooks).toHaveBeenCalledWith(workId);
+  });
+
+  test('getActiveResources delegates to temporal-truth', async () => {
+    const temporalTruth = require('../src/services/temporal-truth');
+    await truthManager.getActiveResources(workId);
+    expect(temporalTruth.getActiveResources).toHaveBeenCalledWith(workId);
+  });
+
+  test('regenerateProjections delegates to temporal-truth', async () => {
+    const temporalTruth = require('../src/services/temporal-truth');
+    await truthManager.regenerateProjections(workId);
+    expect(temporalTruth.regenerateProjections).toHaveBeenCalledWith(workId);
+  });
+
+  test('analyzeTrends delegates to temporal-truth', async () => {
+    const temporalTruth = require('../src/services/temporal-truth');
+    await truthManager.analyzeTrends(workId, 'emotional_arc');
+    expect(temporalTruth.analyzeTrends).toHaveBeenCalledWith(workId, 'emotional_arc', undefined);
+  });
+
+  test('detectAnomalies delegates to temporal-truth', async () => {
+    const temporalTruth = require('../src/services/temporal-truth');
+    await truthManager.detectAnomalies(workId);
+    expect(temporalTruth.detectAnomalies).toHaveBeenCalledWith(workId);
+  });
+
+  test('materializeState delegates to temporal-truth', async () => {
+    const temporalTruth = require('../src/services/temporal-truth');
+    await truthManager.materializeState(workId, 5);
+    expect(temporalTruth.materializeState).toHaveBeenCalledWith(workId, 5);
+  });
 });
