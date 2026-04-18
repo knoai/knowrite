@@ -17,7 +17,7 @@
     "qwen"
   ],
   "author": "",
-  "license": "NC-1.0",
+  "license": "AGPL-3.0",
   "dependencies": {
     "axios": "^1.6.0",
     "cors": "^2.8.6",

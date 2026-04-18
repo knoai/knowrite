@@ -15,7 +15,7 @@
 - [x] RAG 向量检索（零外部依赖，纯 JS + SQLite）
 - [x] Prompt 自动进化（基于 Fitness 数据）
 - [x] 世界观记忆库（人物 / 剧情线 / 地图 / lore）
-- [x] 前后端分离（`knowrite` NC-1.0 + `knowrite-ui` MIT）
+- [x] 前后端分离（`knowrite` AGPL-3.0 + `knowrite-ui` MIT）
 - [x] 安全体系（认证 / CORS / 限流 / 路径遍历防护 / API Key 加密）
 - [x] AI 搜索优化（llms.txt / copilot-instructions / SEO meta / robots.txt）
 
@@ -46,7 +46,7 @@
 - 部署：Docker + Kubernetes / 云平台 Serverless
 
 ### 商业许可
-- 后端引擎保持 NC-1.0（开源非商业）
+- 后端引擎保持 AGPL-3.0（开源，网络服务衍生作品需开源）
 - SaaS 平台代码闭源，基于引擎二次开发
 - 开源社区版本与商业 SaaS 版本双轨并行
 
@@ -159,7 +159,7 @@
                     ┌─────────────────────────────────────────┐
                     │      knowrite 创作引擎（后端）         │
                     │   Node.js / Express / SQLite / RAG      │
-                    │   NC-1.0 协议（开源引擎）                │
+                    │   AGPL-3.0 协议（开源引擎）              │
                     └─────────────────────────────────────────┘
                                      │
             ┌────────────┬───────────┼───────────┬────────────┐
