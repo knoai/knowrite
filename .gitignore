@@ -24,3 +24,6 @@ works/*/
 # Temporary
 tmp/
 temp/
+
+# npm cache
+.npm-cache/

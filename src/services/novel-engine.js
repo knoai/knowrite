@@ -11,6 +11,7 @@ const fileStore = require('./file-store');
 const { getWorldContextForPrompt } = require('./world-context');
 const { evaluateChapterFitness, saveFitness } = require('./fitness-evaluator');
 const { buildRagContext, indexChapterSummary } = require('./rag-retriever');
+const truthManager = require('./truth-manager');
 
 const engineCfg = require('../../config/engine.json');
 const SUMMARY_WINDOW_SIZE = engineCfg.context.summaryWindowSize;
@@ -690,6 +691,17 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     console.error('[novel-engine] RAG 摘要索引失败:', err.message);
   }
 
+  // 时序真相数据库：提取 truth delta 并更新
+  try {
+    const summaryDelta = extractTruthDeltaFromSummary(summaryResult.content, workId, nextNumber);
+    if (summaryDelta) {
+      await truthManager.applyChapterDelta(workId, nextNumber, summaryDelta);
+      console.log(`[truth] 第${nextNumber}章 truth delta 已应用`);
+    }
+  } catch (err) {
+    console.error('[novel-engine] truth delta 应用失败:', err.message);
+  }
+
   // Fitness 评估
   await runFitnessEvaluation(workId, nextNumber, finalResult.chars);
 
@@ -793,6 +805,17 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
     await indexChapterSummary(workId, nextNumber, summaryResult.content, models.summarizer);
   } catch (err) {
     console.error('[novel-engine] RAG 摘要索引失败:', err.message);
+  }
+
+  // 时序真相数据库：提取 truth delta 并更新
+  try {
+    const summaryDelta = extractTruthDeltaFromSummary(summaryResult.content, workId, nextNumber);
+    if (summaryDelta) {
+      await truthManager.applyChapterDelta(workId, nextNumber, summaryDelta);
+      console.log(`[truth] 第${nextNumber}章 truth delta 已应用`);
+    }
+  } catch (err) {
+    console.error('[novel-engine] truth delta 应用失败:', err.message);
   }
 
   // Fitness 评估
@@ -1172,6 +1195,49 @@ async function correctStyle(workId, chapterNumber, newStyle, model, callbacks) {
   const correctedFile = `chapter_${chapterNumber}_style_corrected.txt`;
   await writeFile(workId, correctedFile, result.content);
   return { filename: correctedFile, chars: result.chars };
+}
+
+/**
+ * 从章节摘要中提取 truth delta（用于时序真相数据库）
+ * 
+ * 当前策略：
+ * 1. 尝试解析摘要中的 JSON 代码块（如果 Summarizer 被修改为输出结构化 delta）
+ * 2. 如果失败，返回 null（后续可通过修改 Summarizer prompt 启用）
+ * 
+ * TODO: 扩展 Summarizer prompt 以输出 truth delta JSON
+ */
+function extractTruthDeltaFromSummary(summaryContent, workId, chapterNumber) {
+  // 尝试提取 JSON 代码块
+  const jsonMatch = summaryContent.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) {
+    try {
+      const delta = JSON.parse(jsonMatch[1]);
+      // 验证基本结构
+      if (delta && (delta.characterChanges || delta.worldChanges || delta.newHooks || delta.newResources)) {
+        return delta;
+      }
+    } catch (err) {
+      // JSON 解析失败，忽略
+    }
+  }
+
+  // 尝试提取 summary 末尾的 JSON（无代码块格式）
+  const lastBrace = summaryContent.lastIndexOf('}');
+  const firstBrace = summaryContent.lastIndexOf('{', lastBrace);
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      const delta = JSON.parse(summaryContent.slice(firstBrace, lastBrace + 1));
+      if (delta && (delta.characterChanges || delta.worldChanges || delta.newHooks || delta.newResources)) {
+        return delta;
+      }
+    } catch (err) {
+      // 忽略
+    }
+  }
+
+  // 当前 Summarizer 未输出结构化 delta，返回 null
+  // 后续可通过修改 prompts/summary.md 启用
+  return null;
 }
 
 module.exports = {

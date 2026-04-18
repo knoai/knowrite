@@ -10,6 +10,7 @@ const rateLimit = require('express-rate-limit');
 const novelRouter = require('./routes/novel');
 const worldContextRouter = require('./routes/world-context');
 const { router: templatesRouter, seedDefaultTemplates } = require('./routes/templates');
+const temporalTruthRouter = require('./routes/temporal-truth');
 const { getSettings } = require('./services/settings-store');
 const { requireAuth } = require('./middleware/auth');
 const { runStreamChat } = require('./core/chat');
@@ -101,6 +102,7 @@ app.use(express.static(path.join(__dirname, netCfg.server.staticDir)));
 app.use('/api/novel', novelRouter);
 app.use('/api/novel/works/:workId', worldContextRouter);
 app.use('/api/novel/story-templates', templatesRouter);
+app.use('/api/truth', temporalTruthRouter);
 
 // 健康检查
 app.get('/health', async (req, res) => {

@@ -323,6 +323,126 @@ const Embedding = sequelize.define('Embedding', {
 
 Work.hasMany(Embedding, { foreignKey: 'workId', sourceKey: 'workId', as: 'embeddings' });
 
+// ==================== 时序真相数据库模型 ====================
+
+// 1. 真相事件流（不可变）
+const TruthEvent = sequelize.define('TruthEvent', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  chapterNumber: { type: DataTypes.INTEGER, allowNull: false },
+  eventSequence: { type: DataTypes.INTEGER, allowNull: false },
+  eventType: {
+    type: DataTypes.STRING, allowNull: false,
+    // char_location_change, char_health_change, char_mood_change,
+    // char_relationship_change, char_knowledge_gain, char_goal_change,
+    // world_location_change, world_event_start, world_event_end, world_weather_change,
+    // hook_created, hook_progressed, hook_resolved, hook_abandoned,
+    // resource_acquired, resource_consumed, resource_transferred, resource_lost
+  },
+  subjectType: { type: DataTypes.STRING, allowNull: false },
+  subjectId: { type: DataTypes.STRING, allowNull: false },
+  payload: { type: DataTypes.JSON, allowNull: false },
+  sourceChapter: { type: DataTypes.INTEGER, allowNull: false },
+  sourceText: { type: DataTypes.TEXT, allowNull: true },
+  extractedBy: { type: DataTypes.STRING, defaultValue: 'summarizer' },
+  confidence: { type: DataTypes.FLOAT, defaultValue: 1.0 },
+}, {
+  tableName: 'truth_events',
+  timestamps: true,
+  updatedAt: false,
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'chapterNumber', 'eventSequence'] },
+    { fields: ['workId', 'subjectType', 'subjectId'] },
+    { fields: ['workId', 'eventType'] },
+    { fields: ['workId', 'chapterNumber'] },
+    { fields: ['workId'] },
+  ],
+});
+
+Work.hasMany(TruthEvent, { foreignKey: 'workId', sourceKey: 'workId', as: 'truthEvents' });
+
+// 2. 真相状态（物化视图，从事件流计算）
+const TruthState = sequelize.define('TruthState', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  chapterNumber: { type: DataTypes.INTEGER, allowNull: false },
+  characterStates: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+  worldState: { type: DataTypes.JSON, allowNull: false, defaultValue: {} },
+  emotionalArcs: { type: DataTypes.JSON, allowNull: true, defaultValue: [] },
+  isMaterialized: { type: DataTypes.BOOLEAN, defaultValue: true },
+  lastEventId: { type: DataTypes.INTEGER, allowNull: true },
+  computedAt: { type: DataTypes.DATE, allowNull: true },
+  statsSnapshot: { type: DataTypes.JSON, allowNull: true },
+}, {
+  tableName: 'truth_states',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'chapterNumber'], unique: true },
+    { fields: ['workId'] },
+  ],
+});
+
+Work.hasMany(TruthState, { foreignKey: 'workId', sourceKey: 'workId', as: 'truthStates' });
+
+// 3. 伏笔追踪
+const TruthHook = sequelize.define('TruthHook', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  hookId: { type: DataTypes.STRING, allowNull: false },
+  description: { type: DataTypes.TEXT, allowNull: false },
+  type: { type: DataTypes.STRING, defaultValue: 'foreshadow' },
+  createdChapter: { type: DataTypes.INTEGER, allowNull: false },
+  targetChapter: { type: DataTypes.INTEGER, allowNull: true },
+  resolvedChapter: { type: DataTypes.INTEGER, allowNull: true },
+  status: { type: DataTypes.STRING, defaultValue: 'open' },
+  importance: { type: DataTypes.STRING, defaultValue: 'major' },
+  relatedCharacters: { type: DataTypes.JSON, defaultValue: [] },
+  notes: { type: DataTypes.TEXT, allowNull: true },
+}, {
+  tableName: 'truth_hooks',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'hookId'], unique: true },
+    { fields: ['workId', 'status'] },
+    { fields: ['workId'] },
+  ],
+});
+
+Work.hasMany(TruthHook, { foreignKey: 'workId', sourceKey: 'workId', as: 'truthHooks' });
+
+// 4. 资源追踪
+const TruthResource = sequelize.define('TruthResource', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  name: { type: DataTypes.STRING, allowNull: false },
+  category: { type: DataTypes.STRING, allowNull: true },
+  owner: { type: DataTypes.STRING, allowNull: true },
+  quantity: { type: DataTypes.INTEGER, defaultValue: 1 },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  acquiredChapter: { type: DataTypes.INTEGER, allowNull: true },
+  consumedChapter: { type: DataTypes.INTEGER, allowNull: true },
+  lostChapter: { type: DataTypes.INTEGER, allowNull: true },
+  status: { type: DataTypes.STRING, defaultValue: 'active' },
+  transferHistory: { type: DataTypes.JSON, defaultValue: [] },
+}, {
+  tableName: 'truth_resources',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'name'] },
+    { fields: ['workId', 'status'] },
+    { fields: ['workId'] },
+  ],
+});
+
+Work.hasMany(TruthResource, { foreignKey: 'workId', sourceKey: 'workId', as: 'truthResources' });
+
 let initialized = false;
 async function initDb() {
   if (initialized) return;
@@ -348,4 +468,8 @@ module.exports = {
   StoryTemplate,
   WorkTemplateLink,
   Embedding,
+  TruthEvent,
+  TruthState,
+  TruthHook,
+  TruthResource,
 };
