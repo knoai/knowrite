@@ -19,10 +19,14 @@ const { requireAuth } = require('./middleware/auth');
 const { runStreamChat } = require('./core/chat');
 const { validateBody } = require('./middleware/validator');
 const { chatSchema, completionsSchema } = require('./schemas/chat');
+const logStream = require('./services/log-stream');
 
 const app = express();
 
 (async () => {
+  // 初始化日志流拦截
+  logStream.interceptConsole();
+
   try {
     await getSettings();
   } catch (err) {
@@ -123,6 +127,38 @@ const app = express();
 
   // ========== 静态文件 ==========
   app.use(express.static(path.join(__dirname, netCfg.server.staticDir)));
+
+  // 日志流 SSE
+  app.get('/api/logs/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    // 发送历史日志
+    const history = logStream.getHistory();
+    res.write(`data: ${JSON.stringify({ type: 'history', logs: history })}
+
+`);
+
+    // 订阅新日志
+    const onLog = (entry) => {
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'log', ...entry })}
+
+`);
+      } catch {
+        // 客户端已断开
+      }
+    };
+    logStream.subscribe(onLog);
+
+    // 客户端断开时取消订阅
+    req.on('close', () => {
+      logStream.unsubscribe(onLog);
+    });
+  });
 
   // 挂载 novel API
   app.use('/api/novel', novelRouter);
