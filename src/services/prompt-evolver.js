@@ -183,7 +183,7 @@ async function evaluateVariant(variantTemplate, evalDataset, model, callbacks) {
 
 async function evolvePrompt(templateName, workIds, options = {}) {
   const {
-    model = 'deepseek-r1',
+    model,
     variantCount = 3,
     fitnessThreshold = 0.6,
     callbacks = {}

@@ -24,6 +24,10 @@ jest.mock('../../src/services/novel-engine', () => ({
   importOutline: jest.fn(),
   startNovel: jest.fn(),
   continueNovel: jest.fn(),
+  tryCreateOutline: jest.fn(),
+  tryCreateDetailedOutline: jest.fn(),
+  tryCreateChapters: jest.fn(),
+  tryContinue: jest.fn(),
 }));
 
 jest.mock('../../src/services/novel/novel-utils', () => ({
@@ -60,7 +64,14 @@ jest.mock('../../src/services/settings-store', () => ({
   saveReviewDimensions: jest.fn().mockResolvedValue(undefined),
   getReviewPreset: jest.fn().mockResolvedValue('standard'),
   setReviewPreset: jest.fn().mockResolvedValue(undefined),
-  getModelConfig: jest.fn().mockResolvedValue({ provider: 'openai', model: 'gpt-4' }),
+  getModelConfig: jest.fn().mockResolvedValue({
+    provider: 'openai',
+    model: 'gpt-4',
+    providers: {
+      openai: { enabled: true, alias: 'OpenAI', apiKey: 'sk-test', baseURL: 'https://api.openai.com', models: ['gpt-4', 'gpt-3.5'] },
+      kimi: { enabled: true, alias: 'Kimi', apiKey: 'key', baseURL: 'https://api.moonshot.cn', models: ['kimi-k2'] },
+    },
+  }),
   saveModelConfig: jest.fn().mockResolvedValue(undefined),
   switchProvider: jest.fn().mockResolvedValue({ switched: true, provider: 'kimi', rolesUpdated: 20 }),
   getChapterConfig: jest.fn().mockResolvedValue({ targetWords: 2000 }),
@@ -261,7 +272,27 @@ describe('novel routes (non-SSE)', () => {
         .send({ provider: 'kimi' });
       expect(res.status).toBe(200);
       expect(res.body.switched).toBe(true);
-      expect(store.switchProvider).toHaveBeenCalledWith('kimi');
+      expect(store.switchProvider).toHaveBeenCalledWith('kimi', {});
+    });
+
+    it('POST /switch-provider should switch with uniform model', async () => {
+      const store = require('../../src/services/settings-store');
+      const res = await request(app)
+        .post('/api/novel/switch-provider')
+        .send({ provider: 'kimi', mode: 'uniform', uniformModel: 'kimi-k2', roles: ['writer', 'editor'] });
+      expect(res.status).toBe(200);
+      expect(res.body.switched).toBe(true);
+      expect(store.switchProvider).toHaveBeenCalledWith('kimi', { mode: 'uniform', uniformModel: 'kimi-k2', roles: ['writer', 'editor'] });
+    });
+
+    it('POST /switch-provider should switch with custom map', async () => {
+      const store = require('../../src/services/settings-store');
+      const res = await request(app)
+        .post('/api/novel/switch-provider')
+        .send({ provider: 'kimi', mode: 'custom', customMap: { writer: 'kimi-k2', editor: 'kimi-k1' } });
+      expect(res.status).toBe(200);
+      expect(res.body.switched).toBe(true);
+      expect(store.switchProvider).toHaveBeenCalledWith('kimi', { mode: 'custom', customMap: { writer: 'kimi-k2', editor: 'kimi-k1' } });
     });
 
     it('POST /switch-provider should reject missing provider', async () => {
@@ -269,6 +300,118 @@ describe('novel routes (non-SSE)', () => {
         .post('/api/novel/switch-provider')
         .send({});
       expect(res.status).toBe(400);
+    });
+
+    it('POST /test-provider should validate a provider', async () => {
+      const chat = require('../../src/core/chat');
+      const res = await request(app)
+        .post('/api/novel/test-provider')
+        .send({ provider: 'openai' });
+      expect(res.status).toBe(200);
+      expect(res.body.valid).toBe(true);
+      expect(res.body.response).toBe('response');
+      expect(chat.runStreamChat).toHaveBeenCalledWith(
+        [{ role: 'user', content: '你好，请只回复"成功"两个字。' }],
+        { provider: 'openai', model: 'gpt-4', temperature: 0.7 }
+      );
+    });
+
+    it('POST /test-provider should reject missing provider', async () => {
+      const res = await request(app)
+        .post('/api/novel/test-provider')
+        .send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/缺少 provider/);
+    });
+
+    it('POST /test-provider should reject unknown provider', async () => {
+      const res = await request(app)
+        .post('/api/novel/test-provider')
+        .send({ provider: 'unknown' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/未找到 Provider/);
+    });
+
+    it('POST /test-provider should reject provider without models', async () => {
+      const store = require('../../src/services/settings-store');
+      store.getModelConfig.mockResolvedValueOnce({
+        providers: { empty: { enabled: true, alias: 'Empty', apiKey: '', baseURL: '', models: [] } },
+      });
+      const res = await request(app)
+        .post('/api/novel/test-provider')
+        .send({ provider: 'empty' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/没有配置可用模型/);
+    });
+
+    it('POST /test-provider should return invalid on chat error', async () => {
+      const chat = require('../../src/core/chat');
+      chat.runStreamChat.mockRejectedValueOnce(new Error('Network timeout'));
+      const res = await request(app)
+        .post('/api/novel/test-provider')
+        .send({ provider: 'openai' });
+      expect(res.status).toBe(200);
+      expect(res.body.valid).toBe(false);
+      expect(res.body.error).toBe('Network timeout');
+    });
+
+    it('POST /test-models should test all models', async () => {
+      const chat = require('../../src/core/chat');
+      const res = await request(app)
+        .post('/api/novel/test-models')
+        .send({ provider: 'openai' });
+      expect(res.status).toBe(200);
+      expect(res.body.provider).toBe('openai');
+      expect(res.body.results).toHaveLength(2);
+      expect(res.body.results[0]).toMatchObject({ model: 'gpt-4', valid: true, response: 'response' });
+      expect(res.body.results[1]).toMatchObject({ model: 'gpt-3.5', valid: true, response: 'response' });
+      expect(chat.runStreamChat).toHaveBeenCalledTimes(2);
+    });
+
+    it('POST /test-models should reject missing provider', async () => {
+      const res = await request(app)
+        .post('/api/novel/test-models')
+        .send({});
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/缺少 provider/);
+    });
+
+    it('POST /test-models should reject unknown provider', async () => {
+      const res = await request(app)
+        .post('/api/novel/test-models')
+        .send({ provider: 'unknown' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/未找到 Provider/);
+    });
+
+    it('POST /test-models should reject provider without models', async () => {
+      const store = require('../../src/services/settings-store');
+      store.getModelConfig.mockResolvedValueOnce({
+        providers: { empty: { enabled: true, alias: 'Empty', apiKey: '', baseURL: '', models: [] } },
+      });
+      const res = await request(app)
+        .post('/api/novel/test-models')
+        .send({ provider: 'empty' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/没有配置可用模型/);
+    });
+
+    it('POST /test-models should handle partial failures', async () => {
+      const chat = require('../../src/core/chat');
+      chat.runStreamChat.mockImplementation((_messages, config) => {
+        if (config.model === 'gpt-4') return Promise.resolve({ content: 'ok1', chars: 3, durationMs: 100 });
+        return Promise.reject(new Error('quota exceeded'));
+      });
+      const res = await request(app)
+        .post('/api/novel/test-models')
+        .send({ provider: 'openai' });
+      chat.runStreamChat.mockRestore?.();
+      // restore default mock for subsequent tests
+      chat.runStreamChat.mockResolvedValue({ content: 'response', chars: 100, durationMs: 500 });
+      expect(res.status).toBe(200);
+      expect(res.body.results).toHaveLength(2);
+      expect(res.body.results[0]).toMatchObject({ model: 'gpt-4', valid: true, response: 'ok1' });
+      expect(res.body.results[1]).toMatchObject({ model: 'gpt-3.5', valid: false, error: 'quota exceeded' });
     });
 
     it('GET /writing-mode should return mode', async () => {
@@ -283,6 +426,81 @@ describe('novel routes (non-SSE)', () => {
         .send({ mode: 'free' });
       expect(res.status).toBe(200);
       expect(res.body.writingMode).toBe('free');
+    });
+  });
+
+  // ===== 尝试创作（渐进式流程） =====
+  describe('try-create endpoints', () => {
+    beforeEach(() => {
+      const engine = require('../../src/services/novel-engine');
+      engine.tryCreateOutline.mockImplementation(async (_topic, _style, _strategy, _customModels, callbacks) => {
+        if (callbacks?.onDone) callbacks.onDone({ workId: 'try1', outlineTheme: 'theme' });
+      });
+      engine.tryCreateDetailedOutline.mockImplementation(async (_workId, _customModels, callbacks) => {
+        if (callbacks?.onDone) callbacks.onDone({ workId: 'try1', outlineDetailed: 'detailed' });
+      });
+      engine.tryCreateChapters.mockImplementation(async (_workId, _customModels, callbacks) => {
+        if (callbacks?.onDone) callbacks.onDone({ workId: 'try1', chapters: [{ number: 1 }] });
+      });
+      engine.tryContinue.mockImplementation(async (_workId, _customModels, callbacks) => {
+        if (callbacks?.onDone) callbacks.onDone({ workId: 'try1', chapters: [{ number: 1 }, { number: 2 }] });
+      });
+    });
+
+    it('POST /try/outline should start try creation', async () => {
+      const engine = require('../../src/services/novel-engine');
+      const res = await request(app)
+        .post('/api/novel/try/outline')
+        .send({ topic: 'Test', platformStyle: '番茄', authorStyle: '热血', strategy: 'pipeline' });
+      expect(res.status).toBe(200);
+      expect(engine.tryCreateOutline).toHaveBeenCalled();
+    });
+
+    it('POST /try/outline should reject missing topic', async () => {
+      const res = await request(app).post('/api/novel/try/outline').send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /try/detailed-outline should generate detailed outline', async () => {
+      const engine = require('../../src/services/novel-engine');
+      const res = await request(app)
+        .post('/api/novel/try/detailed-outline')
+        .send({ workId: 'try1' });
+      expect(res.status).toBe(200);
+      expect(engine.tryCreateDetailedOutline).toHaveBeenCalledWith('try1', {}, expect.any(Object));
+    });
+
+    it('POST /try/detailed-outline should reject missing workId', async () => {
+      const res = await request(app).post('/api/novel/try/detailed-outline').send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /try/chapters should generate first chapters', async () => {
+      const engine = require('../../src/services/novel-engine');
+      const res = await request(app)
+        .post('/api/novel/try/chapters')
+        .send({ workId: 'try1', count: 3 });
+      expect(res.status).toBe(200);
+      expect(engine.tryCreateChapters).toHaveBeenCalledWith('try1', {}, expect.any(Object), 3);
+    });
+
+    it('POST /try/chapters should reject missing workId', async () => {
+      const res = await request(app).post('/api/novel/try/chapters').send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('POST /try/continue should continue novel', async () => {
+      const engine = require('../../src/services/novel-engine');
+      const res = await request(app)
+        .post('/api/novel/try/continue')
+        .send({ workId: 'try1' });
+      expect(res.status).toBe(200);
+      expect(engine.tryContinue).toHaveBeenCalledWith('try1', {}, expect.any(Object));
+    });
+
+    it('POST /try/continue should reject missing workId', async () => {
+      const res = await request(app).post('/api/novel/try/continue').send({});
+      expect(res.status).toBe(400);
     });
   });
 });

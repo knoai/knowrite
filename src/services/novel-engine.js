@@ -330,6 +330,116 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
   return { workId, meta };
 }
 
+// ============ 尝试创作（渐进式流程）============
+
+async function tryCreateOutline(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode) {
+  const workId = generateWorkId(topic, strategy);
+  ensureDir(getWorkDir(workId));
+
+  const outlineModel = customModels.outline;
+  console.log(`[novel-engine] tryCreateOutline 开始: workId=${workId} topic=${topic.substring(0, 30)}... outlineModel=${outlineModel || '(默认角色配置)'}`);
+
+  let meta = {
+    workId,
+    topic,
+    style,
+    platformStyle: platformStyle || '',
+    authorStyle: authorStyle || '',
+    strategy,
+    writingMode: writingMode || null,
+    outlineTheme: '',
+    outlineDetailed: '',
+    outlineMultivolume: '',
+    currentVolume: 1,
+    chapters: [],
+    reviews: {},
+    fitness: {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await saveMeta(workId, meta);
+
+  try {
+    if (callbacks?.onStepStart) callbacks.onStepStart({ key: 'outline_theme', name: '生成主题大纲', model: outlineModel });
+    const outlineThemeResult = await outlineGenerator.generateOutline(topic, style, outlineModel, {
+      onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('outline_theme', chunk); }
+    }, workId);
+    await writeFile(workId, 'outline_theme.txt', outlineThemeResult.content);
+    if (callbacks?.onStepEnd) callbacks.onStepEnd('outline_theme', outlineThemeResult);
+
+    meta.outlineTheme = outlineThemeResult.content;
+    meta.updatedAt = new Date().toISOString();
+    await saveMeta(workId, meta);
+
+    console.log(`[novel-engine] tryCreateOutline 完成: workId=${workId} chars=${outlineThemeResult.chars}`);
+    if (callbacks?.onDone) callbacks.onDone(meta);
+    return { workId, meta, outlineTheme: outlineThemeResult.content };
+  } catch (err) {
+    console.error(`[novel-engine] tryCreateOutline 失败: workId=${workId} error=${err.message}`);
+    throw err;
+  }
+}
+
+async function tryCreateDetailedOutline(workId, customModels, callbacks) {
+  const meta = await loadMeta(workId);
+  if (!meta) throw new Error('作品不存在');
+
+  const outlineModel = customModels.outline;
+  const { topic, style, outlineTheme } = meta;
+
+  if (callbacks?.onStepStart) callbacks.onStepStart({ key: 'outline_detailed', name: '生成详细纲章', model: outlineModel });
+  const outlineDetailedResult = await outlineGenerator.generateDetailedOutline(topic, style, outlineTheme, outlineModel, {
+    onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('outline_detailed', chunk); }
+  }, workId);
+  await writeFile(workId, 'outline_detailed.txt', outlineDetailedResult.content);
+  if (callbacks?.onStepEnd) callbacks.onStepEnd('outline_detailed', outlineDetailedResult);
+
+  meta.outlineDetailed = outlineDetailedResult.content;
+  meta.updatedAt = new Date().toISOString();
+  await saveMeta(workId, meta);
+
+  if (callbacks?.onDone) callbacks.onDone(meta);
+  return { workId, meta, outlineDetailed: outlineDetailedResult.content };
+}
+
+async function tryCreateChapters(workId, customModels, callbacks, count = 3) {
+  const meta = await loadMeta(workId);
+  if (!meta) throw new Error('作品不存在');
+
+  const strategy = meta.strategy;
+  const isKnowrite = strategy === 'knowrite';
+
+  for (let i = 0; i < count; i++) {
+    const nextNumber = (meta.chapters?.length || 0) + 1;
+    const chapterResult = isKnowrite
+      ? await chapterWriter.writeChapterMultiAgent(workId, meta, nextNumber, {
+          writer: customModels.writer,
+          editor: customModels.editor,
+          humanizer: customModels.humanizer,
+          proofreader: customModels.proofreader,
+          reader: customModels.reader,
+          summarizer: customModels.summarizer,
+        }, callbacks)
+      : await chapterWriter.writeChapterPipeline(workId, meta, nextNumber, {
+          writer: customModels.writer || customModels.chapter,
+          polish: customModels.polish,
+          reader: customModels.reader,
+          summarizer: customModels.summarizer,
+        }, callbacks);
+
+    meta.chapters.push({ number: nextNumber, ...chapterResult });
+    meta.updatedAt = new Date().toISOString();
+    await saveMeta(workId, meta);
+  }
+
+  if (callbacks?.onDone) callbacks.onDone(meta);
+  return { workId, meta };
+}
+
+async function tryContinue(workId, customModels, callbacks) {
+  return continueNovel(workId, customModels, callbacks);
+}
+
 async function continueNovel(workId, customModels, callbacks, options = {}) {
   const meta = await loadMeta(workId);
   if (!meta) throw new Error('作品不存在');
@@ -528,6 +638,10 @@ module.exports = {
   listWorks,
   startNovel,
   continueNovel,
+  tryCreateOutline,
+  tryCreateDetailedOutline,
+  tryCreateChapters,
+  tryContinue,
   importNovel,
   importOutline,
   detectOutlineDeviation,

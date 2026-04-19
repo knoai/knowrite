@@ -84,14 +84,6 @@ async function logApiSummary(data) {
   }
 }
 
-// ========== Provider 分流 ==========
-const PROXY_BASE = process.env.PROXY_URL || netCfg.proxy.baseURL;
-const WEB_PROVIDERS = new Set(netCfg.proxy.webProviders);
-
-function isWebProvider(name) {
-  return WEB_PROVIDERS.has(name?.toLowerCase());
-}
-
 function normalizeError(err) {
   return {
     error: err.name || 'Error',
@@ -145,15 +137,7 @@ app.get('/health', async (req, res) => {
     checks.push({ name: 'disk', status: 'error', message: err.message });
   }
 
-  // 3. Proxy 可达性检查
-  try {
-    await axios.head(`${PROXY_BASE}/health`, { timeout: 5000, validateStatus: () => true });
-    checks.push({ name: 'proxy', status: 'ok', message: 'Proxy 服务可达' });
-  } catch (err) {
-    checks.push({ name: 'proxy', status: 'warning', message: `Proxy 检查失败: ${err.message}` });
-  }
-
-  // 4. 内存使用检查
+  // 3. 内存使用检查
   const mem = process.memoryUsage();
   const heapUsedMB = (mem.heapUsed / 1024 / 1024).toFixed(1);
   const heapTotalMB = (mem.heapTotal / 1024 / 1024).toFixed(1);
@@ -181,54 +165,38 @@ app.get('/health', async (req, res) => {
 // ========== 通用聊天接口 ==========
 app.post('/chat', validateBody(chatSchema), async (req, res, next) => {
   const startTime = Date.now();
-  const { messages, model = 'deepseek-v3', provider: reqProvider, temperature = 0.7 } = req.validatedBody;
+  const { messages, model, provider: reqProvider, temperature = 0.7 } = req.validatedBody;
   const stream = req.validatedBody.stream !== false;
-  const providerName = (reqProvider || process.env.PROVIDER || 'yuanbao').toLowerCase();
+  const providerName = reqProvider?.toLowerCase();
 
   try {
+    if (!providerName || !model) {
+      return res.status(400).json({ error: '缺少 provider 或 model 参数，请先在「设置-模型配置」中配置模型' });
+    }
 
-    if (isWebProvider(providerName)) {
-      // Web Provider → 转发到 proxy
-      const proxyModel = providerName.includes('/') ? model : `${providerName}/${model}`;
-      const proxyRes = await axios.post(
-        `${PROXY_BASE}/v1/chat/completions`,
-        { model: proxyModel, messages, temperature, stream },
-        { responseType: stream ? 'stream' : 'json', timeout: 300000 }
+    if (stream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const result = await runStreamChat(
+        messages,
+        { provider: providerName, model, temperature },
+        {
+          onChunk: (chunk) => {
+            res.write(`data: ${JSON.stringify({ chunk }) }\n\n`);
+          },
+        }
       );
-      if (stream) {
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        proxyRes.data.pipe(res);
-      } else {
-        res.json(proxyRes.data);
-      }
+      res.write(`data: ${JSON.stringify({ done: true, chars: result.chars, durationMs: result.durationMs })}\n\n`);
+      res.end();
     } else {
-      // API Provider → 本地直连
-      if (stream) {
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-
-        const result = await runStreamChat(
-          messages,
-          { provider: providerName, model, temperature },
-          {
-            onChunk: (chunk) => {
-              res.write(`data: ${JSON.stringify({ chunk }) }\n\n`);
-            },
-          }
-        );
-        res.write(`data: ${JSON.stringify({ done: true, chars: result.chars, durationMs: result.durationMs })}\n\n`);
-        res.end();
-      } else {
-        const result = await runStreamChat(
-          messages,
-          { provider: providerName, model, temperature },
-          {}
-        );
-        res.json({ content: result.content, chars: result.chars, durationMs: result.durationMs });
-      }
+      const result = await runStreamChat(
+        messages,
+        { provider: providerName, model, temperature },
+        {}
+      );
+      res.json({ content: result.content, chars: result.chars, durationMs: result.durationMs });
     }
 
     await logApiSummary({ endpoint: '/chat', model, provider: providerName, stream, messageCount: messages.length, durationMs: Date.now() - startTime, status: 'ok' });
@@ -243,71 +211,56 @@ app.post('/v1/chat/completions', validateBody(completionsSchema), async (req, re
   const startTime = Date.now();
   const { messages, model } = req.validatedBody;
   const stream = req.validatedBody.stream === true;
-  const providerName = (req.validatedBody.provider || process.env.PROVIDER || 'yuanbao').toLowerCase();
+  const providerName = req.validatedBody.provider?.toLowerCase();
 
   try {
+    if (!providerName || !model) {
+      return res.status(400).json({ error: '缺少 provider 或 model 参数，请先在「设置-模型配置」中配置模型' });
+    }
 
-    if (isWebProvider(providerName)) {
-      // Web Provider → 转发到 proxy
-      const proxyRes = await axios.post(
-        `${PROXY_BASE}/v1/chat/completions`,
-        req.body,
-        { responseType: stream ? 'stream' : 'json', timeout: 300000 }
+    const id = `chatcmpl-${Date.now()}`;
+    const created = Math.floor(Date.now() / 1000);
+    const modelName = typeof model === 'string' ? model : (model?.model || 'unknown');
+
+    if (stream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      let index = 0;
+      const result = await runStreamChat(
+        messages,
+        { provider: providerName, model: modelName, temperature: req.body.temperature },
+        {
+          onChunk: (chunk) => {
+            res.write(`data: ${JSON.stringify({
+              id, object: 'chat.completion.chunk', created, model: modelName,
+              choices: [{ index: index++, delta: { content: chunk }, finish_reason: null }],
+            })}\n\n`);
+          },
+        }
       );
-      if (stream) {
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        proxyRes.data.pipe(res);
-      } else {
-        res.json(proxyRes.data);
-      }
+      res.write(`data: ${JSON.stringify({
+        id, object: 'chat.completion.chunk', created, model: modelName,
+        choices: [{ index, delta: {}, finish_reason: 'stop' }],
+      })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
     } else {
-      // API Provider → 本地 OpenAI 兼容输出
-      const id = `chatcmpl-${Date.now()}`;
-      const created = Math.floor(Date.now() / 1000);
-      const modelName = typeof model === 'string' ? model : (model?.model || 'unknown');
-
-      if (stream) {
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-
-        let index = 0;
-        const result = await runStreamChat(
-          messages,
-          { provider: providerName, model: modelName, temperature: req.body.temperature },
-          {
-            onChunk: (chunk) => {
-              res.write(`data: ${JSON.stringify({
-                id, object: 'chat.completion.chunk', created, model: modelName,
-                choices: [{ index: index++, delta: { content: chunk }, finish_reason: null }],
-              })}\n\n`);
-            },
-          }
-        );
-        res.write(`data: ${JSON.stringify({
-          id, object: 'chat.completion.chunk', created, model: modelName,
-          choices: [{ index, delta: {}, finish_reason: 'stop' }],
-        })}\n\n`);
-        res.write('data: [DONE]\n\n');
-        res.end();
-      } else {
-        const result = await runStreamChat(
-          messages,
-          { provider: providerName, model: modelName, temperature: req.body.temperature },
-          {}
-        );
-        res.json({
-          id, object: 'chat.completion', created, model: modelName,
-          choices: [{
-            index: 0,
-            message: { role: 'assistant', content: result.content },
-            finish_reason: 'stop',
-          }],
-          usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-        });
-      }
+      const result = await runStreamChat(
+        messages,
+        { provider: providerName, model: modelName, temperature: req.body.temperature },
+        {}
+      );
+      res.json({
+        id, object: 'chat.completion', created, model: modelName,
+        choices: [{
+          index: 0,
+          message: { role: 'assistant', content: result.content },
+          finish_reason: 'stop',
+        }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      });
     }
 
     await logApiSummary({ endpoint: '/v1/chat/completions', model, provider: providerName, stream, messageCount: messages.length, durationMs: Date.now() - startTime, status: 'ok' });
@@ -347,7 +300,7 @@ const PORT = process.env.PORT || netCfg.server.port;
 
   const server = app.listen(PORT, () => {
     console.log(`[Server] knowrite 服务已启动: http://localhost:${PORT}`);
-    console.log(`[Server] Proxy: ${PROXY_BASE}`);
+    console.log(`[Server] 模型调用方式: OpenAI 兼容协议（用户配置）`);
     console.log(`[Server] 小说创作工作台: http://localhost:${PORT}/`);
     if (process.env.AUTH_TOKEN) {
       console.log(`[Server] 认证已启用（Bearer Token / X-API-Key）`);

@@ -1,20 +1,13 @@
 const OpenAIProvider = require('./openai');
 
-const PROVIDERS = {
-  openai: OpenAIProvider,
-};
-
 class ProviderFactory {
   static create(providerName, options = {}) {
-    const ProviderClass = PROVIDERS[providerName.toLowerCase()];
-    if (!ProviderClass) {
-      throw new Error(`Unknown provider: ${providerName}. Supported: ${Object.keys(PROVIDERS).join(', ')}`);
-    }
-    return new ProviderClass(options);
+    // 所有 provider 统一使用 OpenAI 兼容协议，名称仅用于标识
+    return new OpenAIProvider(options, providerName);
   }
 
   static list() {
-    return Object.keys(PROVIDERS);
+    return ['openai'];
   }
 }
 

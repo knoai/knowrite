@@ -1,14 +1,15 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { startNovel, continueNovel, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, listWorks, getWorkDir, loadMeta } = require('../services/novel-engine');
+const { startNovel, continueNovel, tryCreateOutline, tryCreateDetailedOutline, tryCreateChapters, tryContinue, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, listWorks, getWorkDir, loadMeta } = require('../services/novel-engine');
 const { expandStyle } = require('../services/novel/novel-utils');
 const { loadPrompt } = require('../services/prompt-loader');
 const { checkContentRepetition, repairContentRepetition } = require('../services/memory-index');
 const { loadFitness } = require('../services/fitness-evaluator');
 const { evolvePrompt, applyCandidate } = require('../services/prompt-evolver');
 const { listPrompts } = require('../services/prompt-loader');
-const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, switchProvider, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode } = require('../services/settings-store');
+const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, switchProvider, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode, getRoleModelConfig } = require('../services/settings-store');
+const { runStreamChat } = require('../core/chat');
 const fileStore = require('../services/file-store');
 const { readFile } = fileStore;
 const { validateBody } = require('../middleware/validator');
@@ -96,6 +97,78 @@ router.post('/continue', validateBody(continueSchema), async (req, res) => {
         res.end();
       },
     }, { targetVolume });
+  } catch (err) {
+    stream.send({ type: 'error', message: err.message });
+    res.end();
+  }
+});
+
+// ============ 尝试创作（渐进式流程）============
+
+router.post('/try/outline', async (req, res) => {
+  const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode } = req.body || {};
+  if (!topic || (!style && (!platformStyle || !authorStyle))) {
+    return res.status(400).json({ error: '缺少 topic 或风格信息' });
+  }
+  const stream = sse(res);
+  try {
+    await tryCreateOutline(topic, style, strategy || 'pipeline', customModels || {}, {
+      onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
+      onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
+      onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
+      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+    }, platformStyle, authorStyle, writingMode);
+  } catch (err) {
+    stream.send({ type: 'error', message: err.message });
+    res.end();
+  }
+});
+
+router.post('/try/detailed-outline', async (req, res) => {
+  const { workId, customModels } = req.body || {};
+  if (!workId) return res.status(400).json({ error: '缺少 workId' });
+  const stream = sse(res);
+  try {
+    await tryCreateDetailedOutline(workId, customModels || {}, {
+      onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
+      onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
+      onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
+      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+    });
+  } catch (err) {
+    stream.send({ type: 'error', message: err.message });
+    res.end();
+  }
+});
+
+router.post('/try/chapters', async (req, res) => {
+  const { workId, customModels, count } = req.body || {};
+  if (!workId) return res.status(400).json({ error: '缺少 workId' });
+  const stream = sse(res);
+  try {
+    await tryCreateChapters(workId, customModels || {}, {
+      onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
+      onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
+      onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
+      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+    }, count || 3);
+  } catch (err) {
+    stream.send({ type: 'error', message: err.message });
+    res.end();
+  }
+});
+
+router.post('/try/continue', async (req, res) => {
+  const { workId, customModels } = req.body || {};
+  if (!workId) return res.status(400).json({ error: '缺少 workId' });
+  const stream = sse(res);
+  try {
+    await tryContinue(workId, customModels || {}, {
+      onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
+      onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
+      onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
+      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+    });
   } catch (err) {
     stream.send({ type: 'error', message: err.message });
     res.end();
@@ -319,7 +392,8 @@ router.post('/deviation-check', async (req, res) => {
   }
   try {
     const text = chapterText || '';
-    const result = await detectOutlineDeviation(workId, parseInt(chapterNumber, 10), text, 'deepseek-r1');
+    const roleCfg = await getRoleModelConfig('deviationCheck');
+    const result = await detectOutlineDeviation(workId, parseInt(chapterNumber, 10), text, roleCfg.model);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -333,7 +407,8 @@ router.post('/deviation-correct', async (req, res) => {
   }
   const stream = sse(res);
   try {
-    const result = await correctOutlineDeviation(workId, parseInt(chapterNumber, 10), 'deepseek-r1', {
+    const roleCfg = await getRoleModelConfig('deviationCheck');
+    const result = await correctOutlineDeviation(workId, parseInt(chapterNumber, 10), roleCfg.model, {
       onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, r) { stream.send({ type: 'stepEnd', step: stepKey, chars: r.chars, durationMs: r.durationMs }); },
@@ -353,7 +428,8 @@ router.post('/style-correct', async (req, res) => {
   }
   const stream = sse(res);
   try {
-    const result = await correctStyle(workId, parseInt(chapterNumber, 10), newStyle, 'deepseek-v3', {
+    const roleCfg = await getRoleModelConfig('styleCorrect');
+    const result = await correctStyle(workId, parseInt(chapterNumber, 10), newStyle, roleCfg.model, {
       onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, r) { stream.send({ type: 'stepEnd', step: stepKey, chars: r.chars, durationMs: r.durationMs }); },
@@ -382,8 +458,13 @@ router.post('/evolve', async (req, res) => {
     return res.status(400).json({ error: '缺少 templateName' });
   }
   try {
+    let evolveModel = model;
+    if (!evolveModel) {
+      const roleCfg = await getRoleModelConfig('promptEvolve');
+      evolveModel = roleCfg.model;
+    }
     const result = await evolvePrompt(templateName, workIds || [], {
-      model: model || 'deepseek-r1',
+      model: evolveModel,
       variantCount: variantCount || 3,
       fitnessThreshold: fitnessThreshold || 0.6,
     });
@@ -420,7 +501,8 @@ router.post('/repetition-check', async (req, res) => {
   const text = file ? await readFile(workId, file) : '';
   const expandedStyle = (await expandStyle(meta.platformStyle, meta.authorStyle)) || (await expandStyle(meta.style));
   try {
-    const result = await checkContentRepetition(workId, parseInt(chapterNumber, 10), text, expandedStyle, 'deepseek-v3');
+    const roleCfg = await getRoleModelConfig('repetitionRepair');
+    const result = await checkContentRepetition(workId, parseInt(chapterNumber, 10), text, expandedStyle, roleCfg.model);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -442,13 +524,14 @@ router.post('/repetition-repair', async (req, res) => {
   const text = file ? await readFile(workId, file) : '';
   const expandedStyle = (await expandStyle(meta.platformStyle, meta.authorStyle)) || (await expandStyle(meta.style));
   try {
-    const repResult = await checkContentRepetition(workId, parseInt(chapterNumber, 10), text, expandedStyle, 'deepseek-v3');
+    const roleCfg = await getRoleModelConfig('repetitionRepair');
+    const repResult = await checkContentRepetition(workId, parseInt(chapterNumber, 10), text, expandedStyle, roleCfg.model);
     if (!repResult.repetitive || repResult.severity === 'low') {
       stream.send({ type: 'done', result: { repaired: false, reason: '重复程度低，无需修复' } });
       res.end();
       return;
     }
-    const result = await repairContentRepetition(workId, parseInt(chapterNumber, 10), text, repResult, expandedStyle, 'deepseek-v3', {
+    const result = await repairContentRepetition(workId, parseInt(chapterNumber, 10), text, repResult, expandedStyle, roleCfg.model, {
       onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, r) { stream.send({ type: 'stepEnd', step: stepKey, chars: r.chars, durationMs: r.durationMs }); },
@@ -570,14 +653,113 @@ router.post('/model-config', async (req, res) => {
 
 router.post('/switch-provider', async (req, res) => {
   try {
+    const { provider, roles, mode, uniformModel, customMap } = req.body || {};
+    if (!provider) {
+      return res.status(400).json({ error: '缺少 provider 参数' });
+    }
+    const options = {};
+    if (Array.isArray(roles)) options.roles = roles;
+    if (mode) options.mode = mode;
+    if (uniformModel) options.uniformModel = uniformModel;
+    if (customMap && typeof customMap === 'object') options.customMap = customMap;
+    const result = await switchProvider(provider, options);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/test-provider', async (req, res) => {
+  try {
     const { provider } = req.body || {};
     if (!provider) {
       return res.status(400).json({ error: '缺少 provider 参数' });
     }
-    const result = await switchProvider(provider);
-    res.json(result);
+    const cfg = await getModelConfig();
+    const providerCfg = cfg.providers?.[provider];
+    if (!providerCfg) {
+      return res.status(400).json({ error: `未找到 Provider: ${provider}` });
+    }
+    const model = providerCfg.models?.[0];
+    if (!model) {
+      return res.status(400).json({ error: `Provider ${provider} 没有配置可用模型` });
+    }
+
+    const testMessages = [{ role: 'user', content: '你好，请只回复"成功"两个字。' }];
+    const testPromise = runStreamChat(testMessages, { provider, model, temperature: 0.7 });
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('测试请求超时（15秒）')), 15_000)
+    );
+    const result = await Promise.race([testPromise, timeoutPromise]);
+
+    res.json({ valid: true, response: result.content?.substring(0, 200) || '' });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.json({ valid: false, error: err.message });
+  }
+});
+
+async function testModel(provider, model) {
+  const testMessages = [{ role: 'user', content: '你好，请只回复"成功"两个字。' }];
+  const start = Date.now();
+  try {
+    const testPromise = runStreamChat(testMessages, { provider, model, temperature: 0.7 });
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('测试请求超时（15秒）')), 15_000)
+    );
+    const result = await Promise.race([testPromise, timeoutPromise]);
+    return {
+      model,
+      valid: true,
+      response: result.content?.substring(0, 200) || '',
+      durationMs: Date.now() - start,
+    };
+  } catch (err) {
+    return {
+      model,
+      valid: false,
+      error: err.message,
+      durationMs: Date.now() - start,
+    };
+  }
+}
+
+async function runWithConcurrency(tasks, concurrency = 3) {
+  const results = [];
+  const executing = [];
+  for (const [index, task] of tasks.entries()) {
+    const p = task().then((r) => { results[index] = r; return r; });
+    results[index] = p; // placeholder
+    executing.push(p);
+    if (executing.length >= concurrency) {
+      await Promise.race(executing);
+      executing.splice(executing.findIndex((x) => x === p), 1);
+    }
+  }
+  await Promise.all(executing);
+  return results;
+}
+
+router.post('/test-models', async (req, res) => {
+  try {
+    const { provider } = req.body || {};
+    if (!provider) {
+      return res.status(400).json({ error: '缺少 provider 参数' });
+    }
+    const cfg = await getModelConfig();
+    const providerCfg = cfg.providers?.[provider];
+    if (!providerCfg) {
+      return res.status(400).json({ error: `未找到 Provider: ${provider}` });
+    }
+    const models = providerCfg.models || [];
+    if (models.length === 0) {
+      return res.status(400).json({ error: `Provider ${provider} 没有配置可用模型` });
+    }
+
+    const tasks = models.map((model) => () => testModel(provider, model));
+    const results = await runWithConcurrency(tasks, 3);
+    res.json({ provider, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

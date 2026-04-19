@@ -5,21 +5,27 @@ const netCfg = require('../../../config/network.json');
 const DEFAULT_TIMEOUT = netCfg.timeouts.openaiProvider;
 
 class OpenAIProvider extends BaseProvider {
-  constructor(options = {}) {
-    super('openai', options);
-    this.apiKey = options.apiKey || process.env.OPENAI_API_KEY || '';
-    this.baseURL = (options.baseURL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+  constructor(options = {}, name = 'openai') {
+    super(name, options);
+    this.apiKey = options.apiKey || '';
+    this.baseURL = (options.baseURL || '').replace(/\/$/, '');
   }
 
   async authenticate() {
     if (!this.apiKey) {
-      throw new Error('OpenAI provider 缺少 apiKey，请在设置中配置或设置环境变量 OPENAI_API_KEY');
+      throw new Error(`Provider "${this.name}" 缺少 apiKey，请在「模型配置」中设置 API Key`);
+    }
+    if (!this.baseURL) {
+      throw new Error(`Provider "${this.name}" 缺少 baseURL，请在「模型配置」中设置 Base URL`);
     }
     return true;
   }
 
   async chat(messages, options = {}) {
-    const model = options.model || 'gpt-4o';
+    const model = options.model;
+    if (!model) {
+      throw new Error(`Provider "${this.name}" 调用时缺少 model 参数`);
+    }
     const stream = options.stream !== false;
     const temperature = typeof options.temperature === 'number' ? options.temperature : 0.7;
     const maxTokens = options.maxTokens || 4096;

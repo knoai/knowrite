@@ -12,7 +12,7 @@ const messageSchema = z.object({
 
 const chatSchema = z.object({
   messages: z.array(messageSchema).min(1),
-  model: z.string().max(100).optional().default('deepseek-v3'),
+  model: z.string().max(100).optional(),
   provider: z.string().max(50).optional(),
   temperature: z.number().min(0).max(2).optional().default(0.7),
   stream: z.boolean().optional().default(true),

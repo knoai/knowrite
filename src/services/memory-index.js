@@ -186,7 +186,7 @@ ${chapterText.substring(0, 4000)}
 }`;
 
   if (callbacks?.onStepStart) {
-    callbacks.onStepStart({ key: `repetition_${chapterNumber}`, name: `第${chapterNumber}章 重复检查`, model: model || 'deepseek-v3' });
+    callbacks.onStepStart({ key: `repetition_${chapterNumber}`, name: `第${chapterNumber}章 重复检查`, model: model || '(未指定)' });
   }
 
   const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('repetitionRepair', model), {
@@ -257,7 +257,7 @@ ${chapterText}
 请输出修复后的完整章节，并在文末附【修复说明】，列出你做的关键调整。`;
 
   if (callbacks?.onStepStart) {
-    callbacks.onStepStart({ key: `repetition_repair_${chapterNumber}`, name: `第${chapterNumber}章 重复修复`, model: model || 'deepseek-v3' });
+    callbacks.onStepStart({ key: `repetition_repair_${chapterNumber}`, name: `第${chapterNumber}章 重复修复`, model: model || '(未指定)' });
   }
 
   const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('repetitionRepair', model), {

@@ -74,7 +74,7 @@ async function buildRollingContext(workId, meta, nextNumber, models, callbacks) 
   const prevFile = isMultiAgent
     ? `chapter_${nextNumber - 1}_final.txt`
     : `chapter_${nextNumber - 1}_polish.txt`;
-  const compressModel = models?.summarizer || models?.writer || 'deepseek-v3';
+  const compressModel = models?.summarizer || models?.writer || undefined;
 
   // 1. 前1章：前 FULL_TEXT_THRESHOLD 章保留全文，之后压缩
   if (nextNumber > 1) {

@@ -306,11 +306,13 @@ async function saveModelConfig(modelConfig) {
 async function getRoleModelConfig(role) {
   const cfg = await getModelConfig();
   const defaults = cfg.roleDefaults || {};
-  const roleCfg = defaults[role] || { provider: cfg.defaultProvider || 'yuanbao', model: 'deepseek-v3', temperature: 0.7 };
-  // 确保字段完整
+  const roleCfg = defaults[role];
+  if (!roleCfg || !roleCfg.provider || !roleCfg.model) {
+    throw new Error(`角色 "${role}" 未配置模型。请先前往「设置-模型配置」配置该角色的模型。`);
+  }
   return {
-    provider: roleCfg.provider || cfg.defaultProvider || 'yuanbao',
-    model: roleCfg.model || 'deepseek-v3',
+    provider: roleCfg.provider,
+    model: roleCfg.model,
     temperature: typeof roleCfg.temperature === 'number' ? roleCfg.temperature : 0.7,
   };
 }
@@ -331,51 +333,46 @@ async function resolveRoleModelConfig(role, override) {
   return base;
 }
 
-const PROVIDER_ROLE_MAPS = {
-  yuanbao: {
-    writer: 'deepseek-v3', editor: 'deepseek-r1', humanizer: 'hunyuan', polish: 'hunyuan',
-    proofreader: 'deepseek-v3', reader: 'deepseek-v3', summarizer: 'deepseek-v3', reviewer: 'deepseek-v3',
-    planner: 'deepseek-r1', outline: 'deepseek-r1', product: 'deepseek-v3', tech: 'deepseek-r1',
-    reviser: 'deepseek-v3', synthesis: 'deepseek-r1', repetitionRepair: 'deepseek-v3',
-    deviationCheck: 'deepseek-r1', styleCorrect: 'deepseek-v3', expandStyle: 'deepseek-v3',
-    promptEvolve: 'deepseek-r1', fitnessEvaluate: 'deepseek-v3',
-  },
-  doubao: {
-    writer: 'doubao-1.5-pro', editor: 'doubao-1.5-thinking-pro', humanizer: 'doubao-1.5-pro', polish: 'doubao-1.5-pro',
-    proofreader: 'doubao-1.5-pro', reader: 'doubao-1.5-pro', summarizer: 'doubao-1.5-pro', reviewer: 'doubao-1.5-pro',
-    planner: 'doubao-1.5-thinking-pro', outline: 'doubao-1.5-thinking-pro', product: 'doubao-1.5-pro', tech: 'doubao-1.5-thinking-pro',
-    reviser: 'doubao-1.5-pro', synthesis: 'doubao-1.5-thinking-pro', repetitionRepair: 'doubao-1.5-pro',
-    deviationCheck: 'doubao-1.5-thinking-pro', styleCorrect: 'doubao-1.5-pro', expandStyle: 'doubao-1.5-pro',
-    promptEvolve: 'doubao-1.5-thinking-pro', fitnessEvaluate: 'doubao-1.5-pro',
-  },
-  qwen: {
-    writer: 'Qwen3-Max', editor: 'Qwen3-Max-Thinking', humanizer: 'Qwen3.5', polish: 'Qwen3.5',
-    proofreader: 'Qwen3-Max', reader: 'Qwen3-Max', summarizer: 'Qwen3-Max', reviewer: 'Qwen3-Max',
-    planner: 'Qwen3-Max-Thinking', outline: 'Qwen3-Max-Thinking', product: 'Qwen3-Max', tech: 'Qwen3-Max-Thinking',
-    reviser: 'Qwen3-Max', synthesis: 'Qwen3-Max-Thinking', repetitionRepair: 'Qwen3-Max',
-    deviationCheck: 'Qwen3-Max-Thinking', styleCorrect: 'Qwen3-Max', expandStyle: 'Qwen3-Max',
-    promptEvolve: 'Qwen3-Max-Thinking', fitnessEvaluate: 'Qwen3-Max',
-  },
-  kimi: {
-    writer: 'kimi-k2', editor: 'kimi-k1', humanizer: 'k2.5快速', polish: 'k2.5快速',
-    proofreader: 'kimi-k2', reader: 'kimi-k2', summarizer: 'kimi-k2', reviewer: 'kimi-k2',
-    planner: 'kimi-k1', outline: 'kimi-k1', product: 'kimi-k2', tech: 'kimi-k1',
-    reviser: 'kimi-k2', synthesis: 'kimi-k1', repetitionRepair: 'kimi-k2',
-    deviationCheck: 'kimi-k1', styleCorrect: 'kimi-k2', expandStyle: 'kimi-k2',
-    promptEvolve: 'kimi-k1', fitnessEvaluate: 'kimi-k2',
-  },
-};
-
-async function switchProvider(provider) {
-  const roleMap = PROVIDER_ROLE_MAPS[provider];
-  if (!roleMap) {
-    throw new Error(`不支持的模型提供商: ${provider}。支持的: ${Object.keys(PROVIDER_ROLE_MAPS).join(', ')}`);
-  }
+async function switchProvider(provider, options = {}) {
+  const { roles, mode = 'smart', uniformModel, customMap } = options;
   const cfg = await getModelConfig();
+
+  // 校验 provider 是否存在于用户配置中
+  const providerCfg = cfg.providers && cfg.providers[provider];
+  if (!providerCfg) {
+    throw new Error(`未找到 Provider "${provider}"。请先在「设置-模型配置」中添加该 Provider。`);
+  }
+
   cfg.defaultProvider = provider;
   cfg.roleDefaults = cfg.roleDefaults || {};
-  for (const [role, model] of Object.entries(roleMap)) {
+
+  // 获取所有已配置的 role keys（若未传 roles 则处理全部）
+  const allRoles = Object.keys(cfg.roleDefaults);
+  const targetRoles = Array.isArray(roles) && roles.length > 0
+    ? roles.filter((r) => allRoles.includes(r))
+    : allRoles;
+
+  if (targetRoles.length === 0) {
+    throw new Error('未指定有效的角色，请先在「设置-模型配置」中配置角色默认模型');
+  }
+
+  const firstModel = Array.isArray(providerCfg.models) && providerCfg.models.length > 0
+    ? providerCfg.models[0]
+    : '';
+
+  for (const role of targetRoles) {
     const existing = cfg.roleDefaults[role] || {};
+    let model;
+    if (mode === 'uniform' && uniformModel) {
+      model = uniformModel;
+    } else if (mode === 'custom' && customMap && customMap[role]) {
+      model = customMap[role];
+    } else if (mode === 'smart') {
+      // smart 模式：统一使用当前 provider 的第一个模型
+      model = firstModel;
+    } else {
+      model = existing.model || firstModel;
+    }
     cfg.roleDefaults[role] = {
       provider,
       model,
@@ -383,7 +380,7 @@ async function switchProvider(provider) {
     };
   }
   await saveModelConfig(cfg);
-  return { switched: true, provider, rolesUpdated: Object.keys(roleMap).length };
+  return { switched: true, provider, mode, rolesUpdated: targetRoles.length, roles: targetRoles };
 }
 
 async function resolveWriterModel(chapterNumber, override) {
@@ -392,9 +389,12 @@ async function resolveWriterModel(chapterNumber, override) {
   if (rotation && rotation.enabled && Array.isArray(rotation.models) && rotation.models.length > 0) {
     const index = ((chapterNumber || 1) - 1) % rotation.models.length;
     const item = rotation.models[index];
+    if (!item.provider || !item.model) {
+      throw new Error('作家轮替配置不完整，请在「设置-模型配置」中检查轮替模型配置');
+    }
     return {
-      provider: item.provider || cfg.defaultProvider || 'yuanbao',
-      model: item.model || 'deepseek-v3',
+      provider: item.provider,
+      model: item.model,
       temperature: typeof item.temperature === 'number' ? item.temperature : 0.85,
     };
   }

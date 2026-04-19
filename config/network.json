@@ -1,7 +1,7 @@
 {
   "proxy": {
     "baseURL": "http://localhost:9000",
-    "webProviders": ["yuanbao", "doubao", "kimi", "qwen"]
+    "webProviders": []
   },
   "timeouts": {
     "chat": 300000,
