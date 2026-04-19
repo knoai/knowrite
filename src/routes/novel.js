@@ -712,9 +712,7 @@ router.post('/test-provider', async (req, res) => {
     if (!providerCfg) {
       return res.status(400).json({ error: `未找到 Provider: ${provider}` });
     }
-    const rawModels = providerCfg.models || [];
-    const firstModel = rawModels[0];
-    const model = typeof firstModel === 'string' ? firstModel : firstModel?.id;
+    const model = providerCfg.models?.[0];
     if (!model) {
       return res.status(400).json({ error: `Provider ${provider} 没有配置可用模型` });
     }
@@ -789,7 +787,7 @@ router.post('/test-models', async (req, res) => {
       return res.status(400).json({ error: `Provider ${provider} 没有配置可用模型` });
     }
 
-    const tasks = models.map((m) => () => testModel(provider, typeof m === 'string' ? m : m.id));
+    const tasks = models.map((model) => () => testModel(provider, model));
     const results = await runWithConcurrency(tasks, 3);
     res.json({ provider, results });
   } catch (err) {

@@ -307,10 +307,6 @@ async function getModelConfig() {
       if (p && p.apiKey) {
         p.apiKey = decryptKey(p.apiKey);
       }
-      // 兼容旧数据：models 从字符串数组转为对象数组
-      if (p && Array.isArray(p.models) && p.models.length > 0 && typeof p.models[0] === 'string') {
-        p.models = p.models.map((m) => ({ id: m, name: m }));
-      }
     }
   }
   return cfg;
@@ -352,15 +348,13 @@ async function getRoleModelConfig(role) {
     provider = availableProviders[0] || '';
   }
 
-  // 获取该 provider 下的可用模型列表（兼容字符串数组和对象数组）
+  // 获取该 provider 下的可用模型列表
   const providerCfg = cfg.providers?.[provider] || {};
-  const rawModels = providerCfg.models || [];
-  const providerModels = rawModels.map((m) => (typeof m === 'string' ? { id: m, name: m } : m));
-  const modelIds = providerModels.map((m) => m.id);
+  const providerModels = providerCfg.models || [];
   let model = roleCfg.model;
   // 若角色 model 为空或不在该 provider 的 model 列表中，回退到 provider 默认模型或第一个可用 model
-  if (!model || (modelIds.length > 0 && !modelIds.includes(model))) {
-    model = providerCfg.defaultModel || providerModels[0]?.id || '';
+  if (!model || (providerModels.length > 0 && !providerModels.includes(model))) {
+    model = providerCfg.defaultModel || providerModels[0] || '';
   }
 
   if (!provider || !model) {
