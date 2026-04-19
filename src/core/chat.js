@@ -20,9 +20,7 @@ axiosRetry(axios, {
 });
 const { getWorkDir } = require('./paths');
 const fileStore = require('../services/file-store');
-const { getModelConfig } = require('../services/settings-store');
-const netCfg = require('../../config/network.json');
-const engineCfg = require('../../config/engine.json');
+const { getModelConfig, getConfig } = require('../services/settings-store');
 
 function normalizeModelConfig(modelConfig) {
   if (typeof modelConfig === 'string') {
@@ -124,6 +122,7 @@ async function runStreamChat(messages, modelConfig, callbacks, traceContext = {}
   // Execution Tracing
   if (traceContext.workId) {
     try {
+      const engineCfg = await getConfig('engine');
       const traceRecord = {
         timestamp: new Date().toISOString(),
         agentType: traceContext.agentType || 'unknown',

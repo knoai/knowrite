@@ -9,14 +9,10 @@
 const { readFile, writeFile } = require('../file-store');
 const { loadPrompt } = require('../prompt-loader');
 const { runStreamChat } = require('../../core/chat');
-const { resolveRoleModelConfig } = require('../settings-store');
+const { resolveRoleModelConfig, getConfig } = require('../settings-store');
 const { buildAntiRepetitionReminder } = require('../memory-index');
 const { buildRagContext } = require('../rag-retriever');
 const { getWorldContextForPrompt } = require('../world-context');
-
-const engineCfg = require('../../../config/engine.json');
-const SUMMARY_WINDOW_SIZE = engineCfg.context.summaryWindowSize;
-const FULL_TEXT_THRESHOLD = engineCfg.context.fullTextThreshold;
 
 /**
  * 压缩单章文本为摘要（带缓存）
@@ -68,7 +64,9 @@ async function compressDistantSummaries(workId, start, end, model, callbacks) {
 /**
  * 构建滚动上下文：近史保留全文/摘要，远史压缩
  */
-async function buildRollingContext(workId, meta, nextNumber, models, callbacks) {
+async function buildRollingContext(workId, meta, nextNumber, models, callbacks, engineCfg) {
+  const FULL_TEXT_THRESHOLD = engineCfg.context.fullTextThreshold;
+  const SUMMARY_WINDOW_SIZE = engineCfg.context.summaryWindowSize;
   const contextParts = [];
   const isMultiAgent = meta.strategy === 'knowrite';
   const prevFile = isMultiAgent
@@ -133,13 +131,14 @@ async function buildRollingContext(workId, meta, nextNumber, models, callbacks) 
  * 构建智能上下文：时间窗口 + 反重复 + RAG
  */
 async function buildSmartContext(workId, meta, nextNumber, models, callbacks) {
-  const timeWindow = await buildRollingContext(workId, meta, nextNumber, models, callbacks);
+  const engineCfg = await getConfig('engine');
+  const timeWindow = await buildRollingContext(workId, meta, nextNumber, models, callbacks, engineCfg);
 
   // 读取当前卷纲章
   const currentVolume = meta.currentVolume || 1;
   let volumeOutline = await readFile(workId, `volume_${currentVolume}_outline.txt`);
 
-  const windowStart = Math.max(1, nextNumber - 1 - SUMMARY_WINDOW_SIZE);
+  const windowStart = Math.max(1, nextNumber - 1 - engineCfg.context.summaryWindowSize);
   const windowEnd = nextNumber - 1;
 
   const antiRepeat = await buildAntiRepetitionReminder(

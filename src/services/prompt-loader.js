@@ -5,13 +5,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const promptCfg = require('../../config/prompts.json');
-const i18nCfg = require('../../config/i18n.json');
-
-const PROMPTS_DIR = path.join(__dirname, promptCfg.directory);
+const { getConfig } = require('./settings-store');
 
 // 获取多语言 Prompt 目录（预留 i18n 扩展）
-function getLangPromptsDir(lang) {
+async function getLangPromptsDir(lang) {
+  const promptCfg = await getConfig('prompts');
+  const i18nCfg = await getConfig('i18n');
+  const PROMPTS_DIR = path.join(__dirname, promptCfg.directory);
   const effectiveLang = lang || i18nCfg.defaultLang || 'zh';
   const langDir = path.join(PROMPTS_DIR, effectiveLang);
   // 如果语言子目录存在则使用，否则回退到根目录
@@ -22,6 +22,8 @@ function getLangPromptsDir(lang) {
 }
 
 async function ensurePromptsDir() {
+  const promptCfg = await getConfig('prompts');
+  const PROMPTS_DIR = path.join(__dirname, promptCfg.directory);
   try {
     await fs.promises.access(PROMPTS_DIR);
   } catch {
@@ -30,6 +32,7 @@ async function ensurePromptsDir() {
 }
 
 async function loadPromptRaw(name, lang) {
+  const promptCfg = await getConfig('prompts');
   // 支持从用户设置中覆盖 core-rules
   if (name === promptCfg.coreRulesName) {
     try {
@@ -38,7 +41,8 @@ async function loadPromptRaw(name, lang) {
       if (settings.skill) return settings.skill;
     } catch (err) { console.error("[prompt-loader] settings error:", err.message); }
   }
-  const dir = getLangPromptsDir(lang);
+  const dir = await getLangPromptsDir(lang);
+  const PROMPTS_DIR = path.join(__dirname, promptCfg.directory);
   const filePath = path.join(dir, `${name}${promptCfg.extension}`);
   try {
     await fs.promises.access(filePath);
@@ -89,7 +93,8 @@ async function loadPrompt(name, variables = {}, lang) {
 
 async function listPrompts(lang) {
   await ensurePromptsDir();
-  const dir = getLangPromptsDir(lang);
+  const promptCfg = await getConfig('prompts');
+  const dir = await getLangPromptsDir(lang);
   const files = await fs.promises.readdir(dir);
   return files
     .filter(f => f.endsWith(promptCfg.extension))
@@ -98,7 +103,8 @@ async function listPrompts(lang) {
 
 async function savePrompt(name, content, lang) {
   await ensurePromptsDir();
-  const dir = getLangPromptsDir(lang);
+  const promptCfg = await getConfig('prompts');
+  const dir = await getLangPromptsDir(lang);
   await fs.promises.writeFile(path.join(dir, `${name}${promptCfg.extension}`), content, 'utf-8');
 }
 

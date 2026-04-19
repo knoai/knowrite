@@ -35,7 +35,7 @@ const {
   extractTruthDeltaFromSummary,
 } = require('./chapter-processor');
 
-const engineCfg = require('../../../config/engine.json');
+
 
 // ============ 内部工具 ============
 
@@ -61,6 +61,7 @@ async function appendToFullTxt(workId, sectionTitle, content) {
 // ============ 7-Agent 多智能体流程 ============
 
 async function writeChapterMultiAgent(workId, meta, nextNumber, models, callbacks) {
+  const engineCfg = await getConfig('engine');
   const style =
     (await expandStyle(meta.platformStyle, meta.authorStyle)) || (await expandStyle(meta.style));
   const topic = meta.topic;
@@ -253,7 +254,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     if (callbacks.onStepEnd) callbacks.onStepEnd(editKey, editResult);
 
     // 双重判定：关键词 + 维度通过率
-    const verdict = editReviewer.parseEditorVerdict(editResult.content);
+    const verdict = await editReviewer.parseEditorVerdict(editResult.content);
     const isPass =
       (verdict.hasPassKeyword && verdict.passRate >= 0.8) ||
       (!verdict.hasFailKeyword && verdict.passRate >= 0.8 && verdict.total > 0);
@@ -317,7 +318,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
 
   // 保存 editor 评审结果为 review JSON（供 fitness evaluator 使用）
   if (lastEditResult) {
-    const finalVerdict = editReviewer.parseEditorVerdict(lastEditResult.content);
+    const finalVerdict = await editReviewer.parseEditorVerdict(lastEditResult.content);
     await editReviewer.saveEditorReviewAsJson(workId, nextNumber, lastEditResult.content, finalVerdict);
   }
 
@@ -467,6 +468,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
 // ============ Pipeline 单章流程（兼容旧版） ============
 
 async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks) {
+  const engineCfg = await getConfig('engine');
   const style =
     (await expandStyle(meta.platformStyle, meta.authorStyle)) || (await expandStyle(meta.style));
   const outlineDetailed = outlineGenerator.getCurrentVolumeOutline(workId, meta);

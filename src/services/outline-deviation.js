@@ -4,9 +4,8 @@
  */
 
 const { runStreamChat } = require('../core/chat');
-const { resolveRoleModelConfig } = require('./settings-store');
+const { resolveRoleModelConfig, getConfig } = require('./settings-store');
 const outlineGenerator = require('./novel/outline-generator');
-const engineCfg = require('../../config/engine.json');
 
 const { initDb, Work, Volume, Chapter } = require('../models');
 
@@ -28,6 +27,7 @@ async function loadMeta(workId) {
 }
 
 async function detectOutlineDeviation(workId, chapterNumber, text, model) {
+  const engineCfg = await getConfig('engine');
   const meta = await loadMeta(workId);
   if (!meta) throw new Error('作品不存在');
   const outline = await outlineGenerator.getCurrentVolumeOutline(workId, meta);

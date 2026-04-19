@@ -149,23 +149,41 @@ function applyPreset(data) {
 async function initSettings() {
   await initDb();
   const existing = await Setting.findByPk(SETTINGS_KEY);
-  if (existing) return; // 已初始化过，完全以数据库为准
+  if (!existing) {
+    // 首次初始化：以 seed-data.json 为底，可选从 example 文件导入默认模板
+    let merged = { ...seedSettings };
+    if (fs.existsSync(EXAMPLE_FILE)) {
+      try {
+        const fileData = JSON.parse(fs.readFileSync(EXAMPLE_FILE, 'utf-8'));
+        merged = { ...seedSettings, ...fileData };
+      } catch (err) { console.error('[settings] read example file error:', err.message); }
+    }
+    merged = ensurePresetFields(merged);
+    merged = applyPreset(merged);
 
-  // 首次初始化：以 seed-data.json 为底，可选从 example 文件导入默认模板
-  let merged = { ...seedSettings };
-  if (fs.existsSync(EXAMPLE_FILE)) {
-    try {
-      const fileData = JSON.parse(fs.readFileSync(EXAMPLE_FILE, 'utf-8'));
-      merged = { ...seedSettings, ...fileData };
-    } catch (err) { console.error('[settings] read example file error:', err.message); }
+    await Setting.create({
+      key: SETTINGS_KEY,
+      value: JSON.stringify(merged),
+    });
   }
-  merged = ensurePresetFields(merged);
-  merged = applyPreset(merged);
 
-  await Setting.create({
-    key: SETTINGS_KEY,
-    value: JSON.stringify(merged),
-  });
+  // 首次初始化：把其他静态配置从 example 文件导入数据库
+  const staticConfigKeys = ['engine', 'fitness', 'i18n', 'network', 'prompts'];
+  for (const key of staticConfigKeys) {
+    const cfgKey = `config:${key}`;
+    const row = await Setting.findByPk(cfgKey);
+    if (row) continue;
+    const examplePath = path.join(CONFIG_DIR, `${key}.example.json`);
+    if (fs.existsSync(examplePath)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(examplePath, 'utf-8'));
+        await Setting.create({ key: cfgKey, value: JSON.stringify(data) });
+        console.log(`[settings] 静态配置已导入数据库: ${key}`);
+      } catch (err) {
+        console.error(`[settings] 读取 example ${key} 失败:`, err.message);
+      }
+    }
+  }
 }
 
 async function getSettings() {
@@ -425,6 +443,33 @@ async function saveWritingMode(mode) {
   const settings = await getSettings();
   settings.writingMode = mode === 'free' ? 'free' : 'industrial';
   await saveSettings(settings);
+}
+
+// ========== 通用静态配置（DB 为准，example 为兜底）==========
+
+async function getConfig(key) {
+  await initSettings();
+  const row = await Setting.findByPk(`config:${key}`);
+  if (row) {
+    try {
+      return JSON.parse(row.value);
+    } catch {
+      // fallthrough to example fallback
+    }
+  }
+  const examplePath = path.join(CONFIG_DIR, `${key}.example.json`);
+  if (fs.existsSync(examplePath)) {
+    return JSON.parse(fs.readFileSync(examplePath, 'utf-8'));
+  }
+  throw new Error(`Config "${key}" not found in database or example file`);
+}
+
+async function saveConfig(key, value) {
+  await initSettings();
+  await Setting.upsert({
+    key: `config:${key}`,
+    value: JSON.stringify(value),
+  });
 }
 
 module.exports = {

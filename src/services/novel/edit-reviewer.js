@@ -5,8 +5,8 @@
 
 const path = require('path');
 const fs = require('fs');
-const engineCfg = require('../../../config/engine.json');
 const { getWorkDir } = require('../../core/paths');
+const { getConfig } = require('../settings-store');
 const fileStore = require('../file-store');
 
 /**
@@ -42,7 +42,8 @@ function buildEditorDraftPreview(text, maxChars, headRatio = 0.5) {
 /**
  * 解析编辑评审结果
  */
-function parseEditorVerdict(content) {
+async function parseEditorVerdict(content) {
+  const engineCfg = await getConfig('engine');
   const dimensions = [];
   const lines = content.split('\n');
   for (const line of lines) {

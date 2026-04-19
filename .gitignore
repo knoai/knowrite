@@ -21,8 +21,13 @@ data/*.db
 works/*/
 !works/.gitkeep
 
-# Runtime user settings (sourced from DB only; use user-settings.example.json as template)
+# Runtime configs (sourced from DB only; use *.example.json as templates)
 config/user-settings.json
+config/engine.json
+config/fitness.json
+config/i18n.json
+config/network.json
+config/prompts.json
 
 # Temporary
 tmp/

@@ -1,8 +1,6 @@
 const axios = require('axios');
 const BaseProvider = require('../base-provider');
-
-const netCfg = require('../../../config/network.json');
-const DEFAULT_TIMEOUT = netCfg.timeouts.openaiProvider;
+const { getConfig } = require('../../services/settings-store');
 
 class OpenAIProvider extends BaseProvider {
   constructor(options = {}, name = 'openai') {
@@ -46,12 +44,13 @@ class OpenAIProvider extends BaseProvider {
   }
 
   async _request(url, body, stream = false) {
+    const netCfg = await getConfig('network');
     const config = {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.apiKey}`,
       },
-      timeout: DEFAULT_TIMEOUT,
+      timeout: netCfg.timeouts.openaiProvider,
       responseType: stream ? 'stream' : 'json',
     };
     return axios.post(url, body, config);

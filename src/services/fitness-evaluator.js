@@ -7,8 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { getWorkDir } = require('../core/paths');
 const fileStore = require('./file-store');
-const { getChapterConfig, getWritingMode, resolveRoleModelConfig } = require('./settings-store');
-const fitnessCfg = require('../../config/fitness.json');
+const { getChapterConfig, getWritingMode, resolveRoleModelConfig, getConfig } = require('./settings-store');
 
 function gaussianScore(actual, target, sigma) {
   return Math.exp(-Math.pow(actual - target, 2) / (2 * Math.pow(sigma, 2)));
@@ -79,6 +78,7 @@ async function loadReaderFeedback(workId, chapterNumber) {
  * @returns {{score: number, breakdown: Object}}
  */
 async function evaluateChapterFitness(workId, chapterNumber, chars, detectOutlineDeviation) {
+  const fitnessCfg = await getConfig('fitness');
   const isFree = (await getWritingMode(workId)) === 'free';
   const weights = isFree ? fitnessCfg.weights.free : fitnessCfg.weights.industrial;
 

@@ -3,7 +3,7 @@ const fs = require('fs');
 const { loadPrompt } = require('./prompt-loader');
 const { WORKS_DIR, ensureDir, getWorkDir, sanitizeWorkId } = require('../core/paths');
 const { runStreamChat } = require('../core/chat');
-const { resolveRoleModelConfig, getWritingMode, getChapterConfig } = require('./settings-store');
+const { resolveRoleModelConfig, getWritingMode, getChapterConfig, getConfig } = require('./settings-store');
 const { initDb, Work, Volume, Chapter, StoryTemplate, WorkTemplateLink, sequelize } = require('../models');
 const fileStore = require('./file-store');
 const truthManager = require('./truth-manager');
@@ -18,9 +18,8 @@ const chapterProcessor = require('./novel/chapter-processor');
 const { extractWorldFromOutlines } = require('./world-extractor');
 const { detectOutlineDeviation } = require('./outline-deviation');
 
-const engineCfg = require('../../config/engine.json');
-
-function generateWorkId(topic, strategy) {
+async function generateWorkId(topic, strategy) {
+  const engineCfg = await getConfig('engine');
   const safeTopic = topic.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_').substring(0, engineCfg.truncation.workIdTopicLength);
   const raw = `${Date.now()}_${safeTopic}_${strategy}`;
   const sanitized = sanitizeWorkId(raw);
@@ -139,6 +138,7 @@ function truncate(str, len) {
 
 async function listWorks() {
   await initDb();
+  const engineCfg = await getConfig('engine');
   const buildWorkItem = (work) => {
     const rawTopic = (work.topic || '').trim();
     const firstLine = rawTopic.split('\n')[0].trim();
@@ -225,7 +225,8 @@ async function listWorks() {
 // ============ Pipeline 单章流程（兼容旧版） ============
 
 async function startNovel(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate) {
-  const workId = generateWorkId(topic, strategy);
+  const engineCfg = await getConfig('engine');
+  const workId = await generateWorkId(topic, strategy);
   ensureDir(getWorkDir(workId));
 
   const outlineModel = customModels.outline;
@@ -372,7 +373,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
 // ============ 尝试创作（渐进式流程）============
 
 async function tryCreateOutline(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate) {
-  const workId = generateWorkId(topic, strategy);
+  const workId = await generateWorkId(topic, strategy);
   ensureDir(getWorkDir(workId));
 
   const outlineModel = customModels.outline;
@@ -548,7 +549,8 @@ async function continueNovel(workId, customModels, callbacks, options = {}) {
 }
 
 async function importNovel(title, content, options = {}) {
-  const workId = generateWorkId(title, 'import');
+  const engineCfg = await getConfig('engine');
+  const workId = await generateWorkId(title, 'import');
   ensureDir(getWorkDir(workId));
   const { style, platformStyle, authorStyle } = options;
 
@@ -598,7 +600,7 @@ async function importNovel(title, content, options = {}) {
 }
 
 async function importOutline(title, outlineText, options = {}) {
-  const workId = generateWorkId(title, 'outline');
+  const workId = await generateWorkId(title, 'outline');
   ensureDir(getWorkDir(workId));
   const { style, platformStyle, authorStyle, optimize } = options;
 
