@@ -78,7 +78,7 @@ async function loadReaderFeedback(workId, chapterNumber) {
  * @param {number} chars - 章节字数
  * @returns {{score: number, breakdown: Object}}
  */
-async function evaluateChapterFitness(workId, chapterNumber, chars) {
+async function evaluateChapterFitness(workId, chapterNumber, chars, detectOutlineDeviation) {
   const isFree = (await getWritingMode(workId)) === 'free';
   const weights = isFree ? fitnessCfg.weights.free : fitnessCfg.weights.industrial;
 
@@ -122,7 +122,6 @@ async function evaluateChapterFitness(workId, chapterNumber, chars) {
       || await fileStore.readFile(workId, `chapter_${chapterNumber}_polish.txt`)
       || '';
     if (chapterText) {
-      const { detectOutlineDeviation } = require('./novel-engine');
       const outlineModel = await resolveRoleModelConfig('outline');
       const devResult = await detectOutlineDeviation(workId, chapterNumber, chapterText, outlineModel.model);
       const sevMap = { low: 1.0, medium: 0.6, high: 0.3 };

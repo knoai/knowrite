@@ -227,7 +227,10 @@ ${chapterText.substring(0, 4000)}
  * 基于重复检查结果自动修复章节
  */
 async function repairContentRepetition(workId, chapterNumber, chapterText, repetitionResult, style, model, callbacks) {
-  const { appendToFullTxt } = require('./novel-engine');
+  const appendToFullTxt = async (wid, title, content) => {
+    const header = title ? `\n\n========== ${title} ==========\n\n` : '\n';
+    await fileStore.appendToFile(wid, 'full.txt', header + content);
+  };
   const chapterCfg = await getChapterConfig();
   const targetWords = chapterCfg.targetWords || 2000;
   const minWords = chapterCfg.minWords || 1800;

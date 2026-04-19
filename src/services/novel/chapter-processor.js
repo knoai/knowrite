@@ -30,7 +30,8 @@ async function generateChapterSummary(chapterContent, style, model, callbacks) {
 async function runFitnessEvaluation(workId, chapterNumber, chars) {
   try {
     const { evaluateChapterFitness, saveFitness } = require('../fitness-evaluator');
-    const fitness = await evaluateChapterFitness(workId, chapterNumber, chars);
+    const { detectOutlineDeviation } = require('../outline-deviation');
+    const fitness = await evaluateChapterFitness(workId, chapterNumber, chars, detectOutlineDeviation);
     await saveFitness(workId, chapterNumber, fitness);
     console.log(`[fitness] 第${chapterNumber}章 评估完成: ${fitness.score}`);
     return fitness;

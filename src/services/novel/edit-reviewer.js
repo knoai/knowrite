@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const engineCfg = require('../../../config/engine.json');
 const { getWorkDir } = require('../../core/paths');
-const { readFile } = require('../novel-engine');
+const fileStore = require('../file-store');
 
 /**
  * 构建编辑历史记录
@@ -16,7 +16,7 @@ async function buildEditHistory(workId, chapterNumber, currentRound) {
   const histories = [];
   const maxCharsPerRound = 1500;
   for (let r = 1; r < currentRound; r++) {
-    const content = await readFile(workId, `chapter_${chapterNumber}_edit_v${r}.txt`);
+    const content = await fileStore.readFile(workId, `chapter_${chapterNumber}_edit_v${r}.txt`);
     if (content) {
       const truncated = content.substring(0, maxCharsPerRound);
       histories.push(`【第${r}轮评审意见】\n${truncated}${content.length > maxCharsPerRound ? '\n...(已截断)' : ''}`);

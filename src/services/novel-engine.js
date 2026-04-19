@@ -15,6 +15,7 @@ const contextBuilder = require('./novel/context-builder');
 const novelUtils = require('./novel/novel-utils');
 const chapterWriter = require('./novel/chapter-writer');
 const chapterProcessor = require('./novel/chapter-processor');
+const { detectOutlineDeviation } = require('./outline-deviation');
 
 const engineCfg = require('../../config/engine.json');
 
@@ -559,29 +560,6 @@ async function importOutline(title, outlineText, options = {}) {
   meta.updatedAt = new Date().toISOString();
   await saveMeta(workId, meta);
   return { workId, meta };
-}
-
-async function detectOutlineDeviation(workId, chapterNumber, text, model) {
-  const meta = await loadMeta(workId);
-  if (!meta) throw new Error('作品不存在');
-  const outline = await outlineGenerator.getCurrentVolumeOutline(workId, meta);
-  const prompt = `你是一位资深编辑，请判断以下第${chapterNumber}章正文是否偏离了给定大纲。\n\n大纲：\n${outline}\n\n正文：\n${text.substring(0, engineCfg.truncation.deviationCheckText)}\n\n请输出 JSON：\n{"severity": "low/medium/high", "reason": "...", "suggestions": ["..."]}`;
-  const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('deviationCheck', model), {});
-  let json = null;
-  try {
-    json = JSON.parse(result.content.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim());
-  } catch {
-    try {
-      const m = result.content.match(/\{[\s\S]*\}/);
-      if (m) json = JSON.parse(m[0]);
-    } catch (err) {
-      console.error('[novel-engine] 偏离检测结果解析失败:', err.message);
-    }
-  }
-  if (!json) {
-    json = { severity: 'low', reason: '无法判断', suggestions: [] };
-  }
-  return json;
 }
 
 async function correctOutlineDeviation(workId, chapterNumber, model, callbacks) {

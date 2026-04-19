@@ -18,7 +18,7 @@ const startSchema = z.object({
 });
 
 const continueSchema = z.object({
-  workId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'workId 只能包含字母、数字、下划线和横线'),
+  workId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$/, 'workId 只能包含字母、数字、中文、下划线和横线'),
   customModels: z.record(z.string()).optional().default({}),
   targetVolume: z.number().int().positive().optional(),
 });

@@ -7,7 +7,7 @@ const { loadPrompt } = require('../prompt-loader');
 const { runStreamChat } = require('../../core/chat');
 const { getWorldContextForPrompt } = require('../world-context');
 const { resolveRoleModelConfig } = require('../settings-store');
-const { readFile } = require('../novel-engine');
+const fileStore = require('../file-store');
 
 async function getChapterWordVariables() {
   return { targetWords: 3000, minWords: 2500, maxWords: 3500 };
@@ -28,7 +28,7 @@ function isMultivolumeStrategy(strategy) {
 async function getCurrentVolumeOutline(workId, meta) {
   if (!isMultivolumeStrategy(meta.strategy)) return meta.outlineDetailed || '';
   const currentVolume = meta.currentVolume || 1;
-  const volOutline = await readFile(workId, `volume_${currentVolume}_outline.txt`);
+  const volOutline = await fileStore.readFile(workId, `volume_${currentVolume}_outline.txt`);
   if (volOutline) return volOutline;
   return meta.outlineDetailed || '';
 }
