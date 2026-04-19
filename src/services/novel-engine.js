@@ -15,6 +15,7 @@ const contextBuilder = require('./novel/context-builder');
 const novelUtils = require('./novel/novel-utils');
 const chapterWriter = require('./novel/chapter-writer');
 const chapterProcessor = require('./novel/chapter-processor');
+const { extractWorldFromOutlines } = require('./world-extractor');
 const { detectOutlineDeviation } = require('./outline-deviation');
 
 const engineCfg = require('../../config/engine.json');
@@ -249,7 +250,12 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  await saveMeta(workId, meta);
+  try {
+    await saveMeta(workId, meta);
+  } catch (saveErr) {
+    console.error(`[novel-engine] saveMeta 失败: workId=${workId} error=${saveErr.message}`);
+    throw new Error(`创建作品元数据失败: ${saveErr.message}`);
+  }
 
   // 关联套路模版
   if (storyTemplate) {
@@ -324,7 +330,22 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
   meta.outlineMultivolume = outlineMultivolume;
   meta.volumes = volumes.length ? volumes : undefined;
 
-  // 5. 写第一章
+  // 5. 自动提取世界观数据
+  try {
+    await extractWorldFromOutlines(
+      workId,
+      meta.outlineTheme,
+      meta.outlineDetailed,
+      meta.outlineMultivolume,
+      outlineModel,
+      callbacks
+    );
+  } catch (err) {
+    console.error(`[novel-engine] 世界观提取失败: ${err.message}`);
+    // 提取失败不应阻塞主流程
+  }
+
+  // 6. 写第一章
   const chapterResult = strategy === 'knowrite'
     ? await chapterWriter.writeChapterMultiAgent(workId, meta, 1, {
         writer: customModels.writer,
@@ -410,8 +431,9 @@ async function tryCreateOutline(topic, style, strategy, customModels, callbacks,
     if (callbacks?.onDone) callbacks.onDone(meta);
     return { workId, meta, outlineTheme: outlineThemeResult.content };
   } catch (err) {
-    console.error(`[novel-engine] tryCreateOutline 失败: workId=${workId} error=${err.message}`);
-    throw err;
+    const step = err?.step || 'outline_theme';
+    console.error(`[novel-engine] tryCreateOutline 失败: workId=${workId} step=${step} error=${err.message}`);
+    throw new Error(`生成主题大纲失败: ${err.message}`);
   }
 }
 
@@ -432,6 +454,20 @@ async function tryCreateDetailedOutline(workId, customModels, callbacks) {
   meta.outlineDetailed = outlineDetailedResult.content;
   meta.updatedAt = new Date().toISOString();
   await saveMeta(workId, meta);
+
+  // 自动提取世界观数据
+  try {
+    await extractWorldFromOutlines(
+      workId,
+      meta.outlineTheme,
+      meta.outlineDetailed,
+      meta.outlineMultivolume,
+      outlineModel,
+      callbacks
+    );
+  } catch (err) {
+    console.error(`[novel-engine] 世界观提取失败: ${err.message}`);
+  }
 
   if (callbacks?.onDone) callbacks.onDone(meta);
   return { workId, meta, outlineDetailed: outlineDetailedResult.content };

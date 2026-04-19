@@ -85,6 +85,15 @@ async function* streamChat(messages, modelConfig) {
 
 async function runStreamChat(messages, modelConfig, callbacks, traceContext = {}) {
   const cfg = normalizeModelConfig(modelConfig);
+
+  // 前置校验：确保模型配置完整
+  if (!cfg.provider) {
+    throw new Error('【模型配置错误】未指定模型 Provider。请前往「设置 → 模型配置」选择 Provider 并填写 Base URL 和 API Key。');
+  }
+  if (!cfg.model) {
+    throw new Error('【模型配置错误】未指定模型名称。请前往「设置 → 模型配置」为对应角色选择模型。');
+  }
+
   let buffer = '';
   let chunkCount = 0;
   const start = Date.now();
@@ -96,8 +105,11 @@ async function runStreamChat(messages, modelConfig, callbacks, traceContext = {}
       if (callbacks && callbacks.onChunk) callbacks.onChunk(chunk);
     }
   } catch (err) {
-    console.error(`[chat] 模型调用失败: provider=${cfg.provider} model=${cfg.model} error=${err.message}`);
-    throw err;
+    const isNetwork = err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND' || err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET';
+    const prefix = isNetwork ? '【网络错误】' : err.message?.includes('配置') || err.message?.includes('Provider') || err.message?.includes('模型') ? '【模型配置错误】' : '【模型调用错误】';
+    const detail = isNetwork ? `无法连接到 ${cfg.provider} (${cfg.model})。请检查 Base URL 是否正确、服务是否运行。原错误: ${err.message}` : err.message;
+    console.error(`[chat] ${prefix} provider=${cfg.provider} model=${cfg.model} error=${err.message}`);
+    throw new Error(`${prefix} ${detail}`);
   }
 
   const result = {

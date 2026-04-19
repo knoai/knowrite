@@ -12,6 +12,7 @@ const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatfor
 const { runStreamChat } = require('../core/chat');
 const fileStore = require('../services/file-store');
 const { readFile } = fileStore;
+const { extractWorldFromOutlines } = require('../services/world-extractor');
 const { validateBody } = require('../middleware/validator');
 const { startSchema, continueSchema, importSchema, importOutlineSchema } = require('../schemas/novel');
 
@@ -37,12 +38,34 @@ function sse(res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  let ended = false;
   return {
     send: (data) => {
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      if (ended) return;
+      try {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        if (res.flush) res.flush();
+      } catch (writeErr) {
+        console.error('[sse] write error:', writeErr.message);
+        ended = true;
+      }
+    },
+    end: () => {
+      if (ended) return;
+      ended = true;
+      try { res.end(); } catch (e) { /* ignore */ }
     },
   };
+}
+
+function sendError(stream, err, context = '') {
+  const msg = err?.message || String(err) || '未知错误';
+  const stack = err?.stack || '';
+  console.error(`[sse-error${context ? ' ' + context : ''}]`, msg, stack);
+  stream.send({ type: 'error', message: msg, context });
+  stream.end();
 }
 
 router.post('/start', validateBody(startSchema), async (req, res) => {
@@ -65,12 +88,11 @@ router.post('/start', validateBody(startSchema), async (req, res) => {
       },
       onDone(meta) {
         stream.send({ type: 'done', meta });
-        res.end();
+        stream.end();
       },
     }, platformStyle, authorStyle, writingMode, storyTemplate);
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/start');
   }
 });
 
@@ -94,19 +116,18 @@ router.post('/continue', validateBody(continueSchema), async (req, res) => {
       },
       onDone(meta) {
         stream.send({ type: 'done', meta });
-        res.end();
+        stream.end();
       },
     }, { targetVolume });
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/continue');
   }
 });
 
 // ============ 尝试创作（渐进式流程）============
 
 router.post('/try/outline', async (req, res) => {
-  const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode } = req.body || {};
+  const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode, storyTemplate } = req.body || {};
   if (!topic || (!style && (!platformStyle || !authorStyle))) {
     return res.status(400).json({ error: '缺少 topic 或风格信息' });
   }
@@ -116,11 +137,10 @@ router.post('/try/outline', async (req, res) => {
       onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
-      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+      onDone(meta) { stream.send({ type: 'done', meta }); stream.end(); },
     }, platformStyle, authorStyle, writingMode, storyTemplate);
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/try/outline');
   }
 });
 
@@ -133,11 +153,10 @@ router.post('/try/detailed-outline', async (req, res) => {
       onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
-      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+      onDone(meta) { stream.send({ type: 'done', meta }); stream.end(); },
     });
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/try/detailed-outline');
   }
 });
 
@@ -150,11 +169,10 @@ router.post('/try/chapters', async (req, res) => {
       onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
-      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+      onDone(meta) { stream.send({ type: 'done', meta }); stream.end(); },
     }, count || 3);
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/try/chapters');
   }
 });
 
@@ -167,11 +185,10 @@ router.post('/try/continue', async (req, res) => {
       onStepStart(step) { stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model }); },
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
-      onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
+      onDone(meta) { stream.send({ type: 'done', meta }); stream.end(); },
     });
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/try/continue');
   }
 });
 
@@ -414,10 +431,9 @@ router.post('/deviation-correct', async (req, res) => {
       onStepEnd(stepKey, r) { stream.send({ type: 'stepEnd', step: stepKey, chars: r.chars, durationMs: r.durationMs }); },
     });
     stream.send({ type: 'done', result });
-    res.end();
+    stream.end();
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/deviation-correct');
   }
 });
 
@@ -435,10 +451,9 @@ router.post('/style-correct', async (req, res) => {
       onStepEnd(stepKey, r) { stream.send({ type: 'stepEnd', step: stepKey, chars: r.chars, durationMs: r.durationMs }); },
     });
     stream.send({ type: 'done', result });
-    res.end();
+    stream.end();
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/style-correct');
   }
 });
 
@@ -537,10 +552,9 @@ router.post('/repetition-repair', async (req, res) => {
       onStepEnd(stepKey, r) { stream.send({ type: 'stepEnd', step: stepKey, chars: r.chars, durationMs: r.durationMs }); },
     });
     stream.send({ type: 'done', result: { repaired: true, filename: result.filename, chars: result.chars } });
-    res.end();
+    stream.end();
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/repetition-repair');
   }
 });
 
@@ -836,10 +850,30 @@ router.post('/chat', async (req, res) => {
     });
     stream.send({ type: 'stepEnd', step: 'chat', chars: result.chars, durationMs: result.durationMs });
     stream.send({ type: 'done' });
-    res.end();
+    stream.end();
   } catch (err) {
-    stream.send({ type: 'error', message: err.message });
-    res.end();
+    sendError(stream, err, '/chat');
+  }
+});
+
+// 手动触发世界观数据提取
+router.post('/works/:workId/extract-world', async (req, res) => {
+  try {
+    const { workId } = req.params;
+    const meta = await loadMeta(workId);
+    if (!meta) return res.status(404).json({ error: '作品不存在' });
+
+    const result = await extractWorldFromOutlines(
+      workId,
+      meta.outlineTheme,
+      meta.outlineDetailed,
+      meta.outlineMultivolume,
+      req.body?.model || null
+    );
+    res.json({ success: true, stats: result.stats });
+  } catch (err) {
+    console.error('[novel] extract-world error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

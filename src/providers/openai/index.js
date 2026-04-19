@@ -63,9 +63,11 @@ class OpenAIProvider extends BaseProvider {
   }
 
   async *_chatStream(url, body) {
+    console.log(`[openai-provider] stream request: ${url} model=${body.model}`);
     const resp = await this._request(url, body, true);
     const stream = resp.data;
     let buffer = '';
+    let yieldedCount = 0;
 
     for await (const chunk of stream) {
       buffer += chunk.toString('utf-8');
@@ -78,7 +80,10 @@ class OpenAIProvider extends BaseProvider {
           try {
             const data = JSON.parse(trimmed.slice(6));
             const content = data.choices?.[0]?.delta?.content || '';
-            if (content) yield content;
+            if (content) {
+              yield content;
+              yieldedCount++;
+            }
           } catch {
             // ignore malformed JSON
           }
@@ -90,11 +95,16 @@ class OpenAIProvider extends BaseProvider {
       try {
         const data = JSON.parse(buffer.trim().slice(6));
         const content = data.choices?.[0]?.delta?.content || '';
-        if (content) yield content;
+        if (content) {
+          yield content;
+          yieldedCount++;
+        }
       } catch {
         // ignore
       }
     }
+
+    console.log(`[openai-provider] stream done, yielded ${yieldedCount} chunks`);
   }
 
   async embed(texts, options = {}) {
