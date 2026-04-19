@@ -4,7 +4,7 @@ const { loadPrompt } = require('./prompt-loader');
 const { WORKS_DIR, ensureDir, getWorkDir, sanitizeWorkId } = require('../core/paths');
 const { runStreamChat } = require('../core/chat');
 const { resolveRoleModelConfig, getWritingMode, getChapterConfig } = require('./settings-store');
-const { initDb, Work, Volume, Chapter, sequelize } = require('../models');
+const { initDb, Work, Volume, Chapter, StoryTemplate, WorkTemplateLink, sequelize } = require('../models');
 const fileStore = require('./file-store');
 const truthManager = require('./truth-manager');
 const outputGovernance = require('./output-governance');
@@ -223,7 +223,7 @@ async function listWorks() {
 
 // ============ Pipeline 单章流程（兼容旧版） ============
 
-async function startNovel(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode) {
+async function startNovel(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate) {
   const workId = generateWorkId(topic, strategy);
   ensureDir(getWorkDir(workId));
 
@@ -250,6 +250,23 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
     updatedAt: new Date().toISOString(),
   };
   await saveMeta(workId, meta);
+
+  // 关联套路模版
+  if (storyTemplate) {
+    try {
+      await initDb();
+      const template = await StoryTemplate.findByPk(parseInt(storyTemplate, 10));
+      if (template) {
+        await WorkTemplateLink.findOrCreate({
+          where: { workId, templateId: template.id },
+          defaults: { workId, templateId: template.id },
+        });
+        console.log(`[novel-engine] 作品 ${workId} 关联套路: ${template.name}`);
+      }
+    } catch (err) {
+      console.error('[novel-engine] 关联套路失败:', err.message);
+    }
+  }
 
   // 1. 生成主题大纲
   if (callbacks.onStepStart) callbacks.onStepStart({ key: 'outline_theme', name: '生成主题大纲', model: outlineModel });
@@ -333,7 +350,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
 
 // ============ 尝试创作（渐进式流程）============
 
-async function tryCreateOutline(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode) {
+async function tryCreateOutline(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate) {
   const workId = generateWorkId(topic, strategy);
   ensureDir(getWorkDir(workId));
 
@@ -359,6 +376,23 @@ async function tryCreateOutline(topic, style, strategy, customModels, callbacks,
     updatedAt: new Date().toISOString(),
   };
   await saveMeta(workId, meta);
+
+  // 关联套路模版
+  if (storyTemplate) {
+    try {
+      await initDb();
+      const template = await StoryTemplate.findByPk(parseInt(storyTemplate, 10));
+      if (template) {
+        await WorkTemplateLink.findOrCreate({
+          where: { workId, templateId: template.id },
+          defaults: { workId, templateId: template.id },
+        });
+        console.log(`[novel-engine] 作品 ${workId} 关联套路: ${template.name}`);
+      }
+    } catch (err) {
+      console.error('[novel-engine] 关联套路失败:', err.message);
+    }
+  }
 
   try {
     if (callbacks?.onStepStart) callbacks.onStepStart({ key: 'outline_theme', name: '生成主题大纲', model: outlineModel });

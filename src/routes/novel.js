@@ -67,7 +67,7 @@ router.post('/start', validateBody(startSchema), async (req, res) => {
         stream.send({ type: 'done', meta });
         res.end();
       },
-    }, platformStyle, authorStyle, writingMode);
+    }, platformStyle, authorStyle, writingMode, storyTemplate);
   } catch (err) {
     stream.send({ type: 'error', message: err.message });
     res.end();
@@ -117,7 +117,7 @@ router.post('/try/outline', async (req, res) => {
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
       onDone(meta) { stream.send({ type: 'done', meta }); res.end(); },
-    }, platformStyle, authorStyle, writingMode);
+    }, platformStyle, authorStyle, writingMode, storyTemplate);
   } catch (err) {
     stream.send({ type: 'error', message: err.message });
     res.end();
