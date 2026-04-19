@@ -99,6 +99,22 @@ const Setting = sequelize.define('Setting', {
   createdAt: 'createdAt',
 });
 
+const Prompt = sequelize.define('Prompt', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  lang: { type: DataTypes.STRING, defaultValue: 'zh' },
+  content: { type: DataTypes.TEXT, defaultValue: '' },
+}, {
+  tableName: 'prompts',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { unique: true, fields: ['name', 'lang'] },
+    { fields: ['name'] },
+  ],
+});
+
 // ==================== 五大创作辅助模块模型 ====================
 
 // 1. 世界观记忆库
@@ -630,4 +646,5 @@ module.exports = {
   AuthorIntent,
   CurrentFocus,
   ChapterIntent,
+  Prompt,
 };

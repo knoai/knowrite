@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { initDb, Setting } = require('../models');
+const { initDb, Setting, Prompt } = require('../models');
 
 function getEncryptionKey() {
   return process.env.ENCRYPTION_KEY || '';
@@ -81,6 +81,7 @@ function decryptKey(encKey) {
 }
 
 const CONFIG_DIR = path.join(__dirname, '../../config');
+const PROMPTS_DIR = path.join(__dirname, '../../prompts');
 const EXAMPLE_FILE = path.join(CONFIG_DIR, 'user-settings.example.json');
 const SETTINGS_KEY = 'user-settings';
 
@@ -182,6 +183,22 @@ async function initSettings() {
       } catch (err) {
         console.error(`[settings] 读取 example ${key} 失败:`, err.message);
       }
+    }
+  }
+
+  // 首次初始化：把 prompts 目录下的 .md 文件导入数据库
+  const promptCount = await Prompt.count();
+  if (promptCount === 0 && fs.existsSync(PROMPTS_DIR)) {
+    try {
+      const files = fs.readdirSync(PROMPTS_DIR).filter(f => f.endsWith('.md'));
+      for (const file of files) {
+        const name = file.replace(/\.md$/, '');
+        const content = fs.readFileSync(path.join(PROMPTS_DIR, file), 'utf-8');
+        await Prompt.create({ name, lang: 'zh', content });
+      }
+      console.log(`[settings] 已导入 ${files.length} 个 prompt 到数据库`);
+    } catch (err) {
+      console.error('[settings] 导入 prompt 失败:', err.message);
     }
   }
 }
@@ -499,4 +516,6 @@ module.exports = {
   saveWritingMode,
   encryptKey,
   decryptKey,
+  getConfig,
+  saveConfig,
 };
