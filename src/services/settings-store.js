@@ -81,7 +81,7 @@ function decryptKey(encKey) {
 }
 
 const CONFIG_DIR = path.join(__dirname, '../../config');
-const SETTINGS_FILE = path.join(CONFIG_DIR, 'user-settings.json');
+const EXAMPLE_FILE = path.join(CONFIG_DIR, 'user-settings.example.json');
 const SETTINGS_KEY = 'user-settings';
 
 const {
@@ -151,12 +151,13 @@ async function initSettings() {
   const existing = await Setting.findByPk(SETTINGS_KEY);
   if (existing) return; // 已初始化过，完全以数据库为准
 
+  // 首次初始化：以 seed-data.json 为底，可选从 example 文件导入默认模板
   let merged = { ...seedSettings };
-  if (fs.existsSync(SETTINGS_FILE)) {
+  if (fs.existsSync(EXAMPLE_FILE)) {
     try {
-      const fileData = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+      const fileData = JSON.parse(fs.readFileSync(EXAMPLE_FILE, 'utf-8'));
       merged = { ...seedSettings, ...fileData };
-    } catch (err) { console.error("[settings] read file error:", err.message); }
+    } catch (err) { console.error('[settings] read example file error:', err.message); }
   }
   merged = ensurePresetFields(merged);
   merged = applyPreset(merged);
@@ -165,12 +166,6 @@ async function initSettings() {
     key: SETTINGS_KEY,
     value: JSON.stringify(merged),
   });
-
-  // 同步备份本地文件
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2), 'utf-8');
 }
 
 async function getSettings() {
@@ -206,11 +201,6 @@ async function saveSettings(settings) {
     key: SETTINGS_KEY,
     value: JSON.stringify(full),
   });
-  // 保留本地备份
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(full, null, 2), 'utf-8');
 }
 
 async function getAuthorStyles() {

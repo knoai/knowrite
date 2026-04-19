@@ -21,6 +21,9 @@ data/*.db
 works/*/
 !works/.gitkeep
 
+# Runtime user settings (sourced from DB only; use user-settings.example.json as template)
+config/user-settings.json
+
 # Temporary
 tmp/
 temp/
