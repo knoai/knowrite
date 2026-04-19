@@ -353,13 +353,14 @@ async function getRoleModelConfig(role) {
   }
 
   // 获取该 provider 下的可用模型列表（兼容字符串数组和对象数组）
-  const rawModels = cfg.providers?.[provider]?.models || [];
+  const providerCfg = cfg.providers?.[provider] || {};
+  const rawModels = providerCfg.models || [];
   const providerModels = rawModels.map((m) => (typeof m === 'string' ? { id: m, name: m } : m));
   const modelIds = providerModels.map((m) => m.id);
   let model = roleCfg.model;
-  // 若角色 model 为空或不在该 provider 的 model 列表中，回退到第一个可用 model
+  // 若角色 model 为空或不在该 provider 的 model 列表中，回退到 provider 默认模型或第一个可用 model
   if (!model || (modelIds.length > 0 && !modelIds.includes(model))) {
-    model = providerModels[0]?.id || '';
+    model = providerCfg.defaultModel || providerModels[0]?.id || '';
   }
 
   if (!provider || !model) {
