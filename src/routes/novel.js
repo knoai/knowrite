@@ -8,7 +8,7 @@ const { checkContentRepetition, repairContentRepetition } = require('../services
 const { loadFitness } = require('../services/fitness-evaluator');
 const { evolvePrompt, applyCandidate } = require('../services/prompt-evolver');
 const { listPrompts } = require('../services/prompt-loader');
-const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, switchProvider, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode, getRoleModelConfig } = require('../services/settings-store');
+const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, switchProvider, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode, getRoleModelConfig, getModelLibrary, saveModelLibrary } = require('../services/settings-store');
 const { runStreamChat } = require('../core/chat');
 const fileStore = require('../services/file-store');
 const { readFile } = fileStore;
@@ -647,6 +647,24 @@ router.post('/review-preset', async (req, res) => {
   }
 });
 
+router.get('/model-library', async (req, res) => {
+  try {
+    const list = await getModelLibrary();
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/model-library', async (req, res) => {
+  try {
+    await saveModelLibrary(req.body || []);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/model-config', async (req, res) => {
   try {
     const cfg = await getModelConfig();
@@ -694,7 +712,9 @@ router.post('/test-provider', async (req, res) => {
     if (!providerCfg) {
       return res.status(400).json({ error: `未找到 Provider: ${provider}` });
     }
-    const model = providerCfg.models?.[0];
+    const rawModels = providerCfg.models || [];
+    const firstModel = rawModels[0];
+    const model = typeof firstModel === 'string' ? firstModel : firstModel?.id;
     if (!model) {
       return res.status(400).json({ error: `Provider ${provider} 没有配置可用模型` });
     }
@@ -769,7 +789,7 @@ router.post('/test-models', async (req, res) => {
       return res.status(400).json({ error: `Provider ${provider} 没有配置可用模型` });
     }
 
-    const tasks = models.map((model) => () => testModel(provider, model));
+    const tasks = models.map((m) => () => testModel(provider, typeof m === 'string' ? m : m.id));
     const results = await runWithConcurrency(tasks, 3);
     res.json({ provider, results });
   } catch (err) {

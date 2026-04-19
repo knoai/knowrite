@@ -10,9 +10,7 @@ class OpenAIProvider extends BaseProvider {
   }
 
   async authenticate() {
-    if (!this.apiKey) {
-      throw new Error(`Provider "${this.name}" 缺少 apiKey，请在「模型配置」中设置 API Key`);
-    }
+    // 本地模型（如 Ollama、LM Studio）不需要 apiKey，仅校验 baseURL
     if (!this.baseURL) {
       throw new Error(`Provider "${this.name}" 缺少 baseURL，请在「模型配置」中设置 Base URL`);
     }

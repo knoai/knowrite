@@ -169,7 +169,7 @@ async function initSettings() {
   }
 
   // 首次初始化：把其他静态配置从 example 文件导入数据库
-  const staticConfigKeys = ['engine', 'fitness', 'i18n', 'network', 'prompts'];
+  const staticConfigKeys = ['engine', 'fitness', 'i18n', 'network', 'prompts', 'model-library'];
   for (const key of staticConfigKeys) {
     const cfgKey = `config:${key}`;
     const row = await Setting.findByPk(cfgKey);
@@ -307,6 +307,10 @@ async function getModelConfig() {
       if (p && p.apiKey) {
         p.apiKey = decryptKey(p.apiKey);
       }
+      // 兼容旧数据：models 从字符串数组转为对象数组
+      if (p && Array.isArray(p.models) && p.models.length > 0 && typeof p.models[0] === 'string') {
+        p.models = p.models.map((m) => ({ id: m, name: m }));
+      }
     }
   }
   return cfg;
@@ -331,13 +335,40 @@ async function saveModelConfig(modelConfig) {
 async function getRoleModelConfig(role) {
   const cfg = await getModelConfig();
   const defaults = cfg.roleDefaults || {};
-  const roleCfg = defaults[role];
-  if (!roleCfg || !roleCfg.provider || !roleCfg.model) {
+  const roleCfg = defaults[role] || {};
+
+  const availableProviders = Object.keys(cfg.providers || {}).filter(
+    k => cfg.providers[k] && cfg.providers[k].enabled !== false
+  );
+
+  // 1. 优先使用角色自身配置的 provider
+  let provider = roleCfg.provider;
+  // 2. 若角色 provider 为空或不在可用列表中，回退到 defaultProvider
+  if (!provider || !availableProviders.includes(provider)) {
+    provider = cfg.defaultProvider;
+  }
+  // 3. 若 defaultProvider 也不可用，回退到第一个可用 provider
+  if (!provider || !availableProviders.includes(provider)) {
+    provider = availableProviders[0] || '';
+  }
+
+  // 获取该 provider 下的可用模型列表（兼容字符串数组和对象数组）
+  const rawModels = cfg.providers?.[provider]?.models || [];
+  const providerModels = rawModels.map((m) => (typeof m === 'string' ? { id: m, name: m } : m));
+  const modelIds = providerModels.map((m) => m.id);
+  let model = roleCfg.model;
+  // 若角色 model 为空或不在该 provider 的 model 列表中，回退到第一个可用 model
+  if (!model || (modelIds.length > 0 && !modelIds.includes(model))) {
+    model = providerModels[0]?.id || '';
+  }
+
+  if (!provider || !model) {
     throw new Error(`角色 "${role}" 未配置模型。请先前往「设置-模型配置」配置该角色的模型。`);
   }
+
   return {
-    provider: roleCfg.provider,
-    model: roleCfg.model,
+    provider,
+    model,
     temperature: typeof roleCfg.temperature === 'number' ? roleCfg.temperature : 0.7,
   };
 }
@@ -464,6 +495,14 @@ async function saveWritingMode(mode) {
 
 // ========== 通用静态配置（DB 为准，example 为兜底）==========
 
+async function getModelLibrary() {
+  return getConfig('model-library');
+}
+
+async function saveModelLibrary(list) {
+  return saveConfig('model-library', list);
+}
+
 async function getConfig(key) {
   await initSettings();
   const row = await Setting.findByPk(`config:${key}`);
@@ -514,6 +553,8 @@ module.exports = {
   saveChapterConfig,
   getWritingMode,
   saveWritingMode,
+  getModelLibrary,
+  saveModelLibrary,
   encryptKey,
   decryptKey,
   getConfig,

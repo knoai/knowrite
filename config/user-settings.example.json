@@ -617,208 +617,111 @@
     }
   ],
   "modelConfig": {
-    "defaultProvider": "qwen",
+    "defaultProvider": "",
     "writerRotation": {
       "enabled": false,
-      "models": [
-        {
-          "provider": "yuanbao",
-          "model": "deepseek-v3",
-          "temperature": 0.85,
-          "alias": "作家A"
-        },
-        {
-          "provider": "yuanbao",
-          "model": "deepseek-r1",
-          "temperature": 0.85,
-          "alias": "作家B"
-        }
-      ]
+      "models": []
     },
-    "providers": {
-      "yuanbao": {
-        "enabled": true,
-        "alias": "元宝",
-        "apiKey": "",
-        "baseURL": "",
-        "models": [
-          "deepseek-v3",
-          "deepseek-r1",
-          "deepseek-v3-search",
-          "deepseek-r1-search",
-          "hunyuan",
-          "hunyuan-t1",
-          "hunyuan-search",
-          "hunyuan-t1-search"
-        ]
-      },
-      "doubao": {
-        "enabled": false,
-        "alias": "豆包",
-        "apiKey": "",
-        "baseURL": "",
-        "models": [
-          "doubao-1.5-pro",
-          "doubao-1.5-thinking-pro",
-          "doubao-lite"
-        ]
-      },
-      "qwen": {
-        "enabled": false,
-        "alias": "千问",
-        "apiKey": "",
-        "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "models": [
-          "Qwen3-Max-Thinking",
-          "Qwen3-Max",
-          "Qwen3.5",
-          "Qwen3.5-Flash",
-          "Qwen3-Coder"
-        ]
-      },
-      "kimi": {
-        "enabled": false,
-        "alias": "Kimi",
-        "apiKey": "",
-        "baseURL": "",
-        "models": [
-          "k2.5快速",
-          "kimi-k2",
-          "kimi-k1",
-          "kimi-search"
-        ]
-      },
-      "openai": {
-        "enabled": true,
-        "alias": "百炼/OpenAI兼容",
-        "apiKey": "",
-        "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "models": [
-          "qwen-turbo",
-          "qwen-plus",
-          "qwen-max"
-        ]
-      },
-      "ollama": {
-        "enabled": false,
-        "alias": "Ollama 本地",
-        "apiKey": "",
-        "baseURL": "http://localhost:11434/v1",
-        "models": [
-          "llama3",
-          "qwen2.5",
-          "deepseek-r1"
-        ]
-      },
-      "lmstudio": {
-        "enabled": false,
-        "alias": "LM Studio 本地",
-        "apiKey": "",
-        "baseURL": "http://localhost:1234/v1",
-        "models": [
-          "local-model"
-        ]
-      }
-    },
+    "providers": {},
     "roleDefaults": {
       "writer": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.85
       },
       "editor": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.8
       },
       "humanizer": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.85
       },
       "polish": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.8
       },
       "proofreader": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.2
       },
       "reader": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "summarizer": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "reviewer": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "planner": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "outline": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.2
       },
       "product": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "tech": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "reviser": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.3
       },
       "synthesis": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "repetitionRepair": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.2
       },
       "deviationCheck": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       },
       "styleCorrect": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.3
       },
       "expandStyle": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.3
       },
       "promptEvolve": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0.2
       },
       "fitnessEvaluate": {
-        "provider": "openai",
-        "model": "qwen-plus",
+        "provider": "",
+        "model": "",
         "temperature": 0
       }
     }

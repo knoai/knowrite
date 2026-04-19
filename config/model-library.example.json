@@ -1,0 +1,104 @@
+[
+  {
+    "key": "qwen",
+    "name": "千问",
+    "url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "models": [
+      { "id": "qwen-plus", "name": "Qwen-Plus" },
+      { "id": "qwen-max", "name": "Qwen-Max" },
+      { "id": "qwen-turbo", "name": "Qwen-Turbo" },
+      { "id": "qwen3-max", "name": "Qwen3-Max" },
+      { "id": "qwen3-coder", "name": "Qwen3-Coder" }
+    ]
+  },
+  {
+    "key": "openai",
+    "name": "OpenAI",
+    "url": "https://api.openai.com/v1",
+    "models": [
+      { "id": "gpt-4o", "name": "GPT-4o" },
+      { "id": "gpt-4o-mini", "name": "GPT-4o Mini" },
+      { "id": "gpt-4-turbo", "name": "GPT-4 Turbo" },
+      { "id": "o3-mini", "name": "o3-mini" }
+    ]
+  },
+  {
+    "key": "deepseek",
+    "name": "DeepSeek",
+    "url": "https://api.deepseek.com/v1",
+    "models": [
+      { "id": "deepseek-chat", "name": "DeepSeek-V3" },
+      { "id": "deepseek-reasoner", "name": "DeepSeek-R1" }
+    ]
+  },
+  {
+    "key": "doubao",
+    "name": "豆包",
+    "url": "https://ark.cn-beijing.volces.com/api/v3",
+    "models": [
+      { "id": "doubao-1.5-pro", "name": "Doubao-1.5-pro" },
+      { "id": "doubao-1.5-thinking-pro", "name": "Doubao-1.5-thinking-pro" },
+      { "id": "doubao-lite", "name": "Doubao-lite" }
+    ]
+  },
+  {
+    "key": "kimi",
+    "name": "Kimi",
+    "url": "https://api.moonshot.cn/v1",
+    "models": [
+      { "id": "kimi-k2", "name": "Kimi K2" },
+      { "id": "kimi-k2.5", "name": "Kimi K2.5" },
+      { "id": "kimi-k1.5", "name": "Kimi K1.5" }
+    ]
+  },
+  {
+    "key": "yuanbao",
+    "name": "元宝",
+    "url": "",
+    "models": [
+      { "id": "deepseek-v3", "name": "DeepSeek-V3" },
+      { "id": "deepseek-r1", "name": "DeepSeek-R1" },
+      { "id": "hunyuan", "name": "混元" },
+      { "id": "hunyuan-t1", "name": "混元T1" }
+    ]
+  },
+  {
+    "key": "anthropic",
+    "name": "Anthropic",
+    "url": "https://api.anthropic.com/v1",
+    "models": [
+      { "id": "claude-3-7-sonnet", "name": "Claude 3.7 Sonnet" },
+      { "id": "claude-3-5-sonnet", "name": "Claude 3.5 Sonnet" },
+      { "id": "claude-3-opus", "name": "Claude 3 Opus" }
+    ]
+  },
+  {
+    "key": "groq",
+    "name": "Groq",
+    "url": "https://api.groq.com/openai/v1",
+    "models": [
+      { "id": "llama-3.3-70b", "name": "Llama 3.3 70B" },
+      { "id": "mixtral-8x7b", "name": "Mixtral 8x7B" },
+      { "id": "gemma2-9b", "name": "Gemma2 9B" }
+    ]
+  },
+  {
+    "key": "ollama",
+    "name": "Ollama 本地",
+    "url": "http://localhost:11434/v1",
+    "models": [
+      { "id": "llama3", "name": "Llama 3" },
+      { "id": "qwen2.5", "name": "Qwen2.5" },
+      { "id": "deepseek-r1", "name": "DeepSeek-R1" },
+      { "id": "phi4", "name": "Phi-4" }
+    ]
+  },
+  {
+    "key": "lmstudio",
+    "name": "LM Studio 本地",
+    "url": "http://localhost:1234/v1",
+    "models": [
+      { "id": "local-model", "name": "Local Model" }
+    ]
+  }
+]

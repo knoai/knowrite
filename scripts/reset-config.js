@@ -31,6 +31,21 @@ async function main() {
 
   console.log('[reset-config] 开始重置配置...');
 
+  // 0. 备份现有 apiKey（避免重置后丢失）
+  let existingApiKeys = {};
+  try {
+    const existing = await Setting.findByPk('user-settings');
+    if (existing) {
+      const old = JSON.parse(existing.value);
+      const oldProviders = old.modelConfig && old.modelConfig.providers;
+      if (oldProviders) {
+        for (const [pk, pv] of Object.entries(oldProviders)) {
+          if (pv && pv.apiKey) existingApiKeys[pk] = pv.apiKey;
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
   // 1. 清空配置相关记录
   await Setting.destroy({ where: { key: 'user-settings' } });
   await Setting.destroy({ where: { key: { [require('sequelize').Op.like]: 'config:%' } } });
@@ -73,11 +88,20 @@ async function main() {
   merged.reviewDimensions = merged[pk.dim] || defaultPresets[merged.reviewPreset].dimensions;
   merged.skill = merged[pk.skill] || defaultPresets[merged.reviewPreset].skill;
 
+  // 合并备份的 apiKey，避免重置后丢失已配置的密钥
+  if (merged.modelConfig && merged.modelConfig.providers) {
+    for (const [pk, apiKey] of Object.entries(existingApiKeys)) {
+      if (merged.modelConfig.providers[pk]) {
+        merged.modelConfig.providers[pk].apiKey = apiKey;
+      }
+    }
+  }
+
   await Setting.create({ key: 'user-settings', value: JSON.stringify(merged) });
   console.log('[reset-config] 已重新导入 user-settings');
 
   // 5. 重新导入静态配置
-  const staticConfigKeys = ['engine', 'fitness', 'i18n', 'network', 'prompts'];
+  const staticConfigKeys = ['engine', 'fitness', 'i18n', 'network', 'prompts', 'model-library'];
   for (const key of staticConfigKeys) {
     const examplePath = path.join(CONFIG_DIR, `${key}.example.json`);
     if (fs.existsSync(examplePath)) {
