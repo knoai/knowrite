@@ -310,4 +310,6 @@ module.exports = {
   updateCharacterVoice,
   getVoiceFingerprintPrompt,
   buildVoiceFingerprintProjection,
+  extractDialogues,
+  analyzeSpeakerVoice,
 };

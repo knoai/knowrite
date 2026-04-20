@@ -156,6 +156,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     }
   }
 
+  console.log(`[prompt-trace] Writer 最终提交：model=${models.writer}, prompt长度=${writerPrompt.length}`);
   const rawResult = await runStreamChat(
     [{ role: 'user', content: writerPrompt }],
     await resolveWriterModel(nextNumber, models.writer),

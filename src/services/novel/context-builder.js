@@ -133,8 +133,10 @@ async function buildRollingContext(workId, meta, nextNumber, models, callbacks, 
  * 构建智能上下文：时间窗口 + 反重复 + RAG
  */
 async function buildSmartContext(workId, meta, nextNumber, models, callbacks) {
+  const totalStart = Date.now();
   const engineCfg = await getConfig('engine');
   const timeWindow = await buildRollingContext(workId, meta, nextNumber, models, callbacks, engineCfg);
+  console.log(`[context-builder] 滚动上下文：长度 ${timeWindow.length}`);
 
   // 读取当前卷纲章
   const currentVolume = meta.currentVolume || 1;
@@ -149,6 +151,7 @@ async function buildSmartContext(workId, meta, nextNumber, models, callbacks) {
     windowStart,
     windowEnd
   );
+  console.log(`[context-builder] 防重复提醒：长度 ${antiRepeat.length}`);
 
   // RAG 检索：基于当前卷纲章检索最相关的历史上下文
   let ragContext = '';
@@ -158,6 +161,7 @@ async function buildSmartContext(workId, meta, nextNumber, models, callbacks) {
       volumeOutline || meta.outlineDetailed || '',
       nextNumber
     );
+    console.log(`[context-builder] RAG 检索：长度 ${ragContext.length}`);
   } catch (err) {
     console.error('[context-builder] RAG 检索失败:', err.message);
   }
@@ -166,6 +170,7 @@ async function buildSmartContext(workId, meta, nextNumber, models, callbacks) {
   let voiceContext = '';
   try {
     voiceContext = await getVoiceFingerprintPrompt(workId);
+    console.log(`[context-builder] 声纹字典：长度 ${voiceContext.length}`);
   } catch (err) {
     console.error('[context-builder] 声纹字典加载失败:', err.message);
   }
@@ -174,6 +179,7 @@ async function buildSmartContext(workId, meta, nextNumber, models, callbacks) {
   let charMemoryContext = '';
   try {
     charMemoryContext = await getCharacterMemoryPrompt(workId, [], nextNumber);
+    console.log(`[context-builder] 角色记忆：长度 ${charMemoryContext.length}`);
   } catch (err) {
     console.error('[context-builder] 角色记忆加载失败:', err.message);
   }

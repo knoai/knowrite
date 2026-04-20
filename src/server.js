@@ -14,6 +14,10 @@ const temporalTruthRouter = require('./routes/temporal-truth');
 const authorFingerprintRouter = require('./routes/author-fingerprint');
 const outputGovernanceRouter = require('./routes/output-governance');
 const inputGovernanceRouter = require('./routes/input-governance');
+const bookDeconstructRouter = require('./routes/book-deconstructor');
+const characterMemoryRouter = require('./routes/character-memory');
+const voiceFingerprintRouter = require('./routes/voice-fingerprint');
+const mcpServer = require('./mcp/server');
 const { getSettings, getConfig } = require('./services/settings-store');
 const { requireAuth } = require('./middleware/auth');
 const { runStreamChat } = require('./core/chat');
@@ -168,6 +172,17 @@ const app = express();
   app.use('/api/style', authorFingerprintRouter);
   app.use('/api/output', outputGovernanceRouter);
   app.use('/api/input-governance', inputGovernanceRouter);
+  app.use('/api/book-deconstruct', bookDeconstructRouter);
+  app.use('/api/novel/works/:workId/character-memories', characterMemoryRouter);
+  app.use('/api/novel/works/:workId/voice-fingerprints', voiceFingerprintRouter);
+
+  // MCP SSE endpoint
+  app.get('/mcp/sse', async (req, res) => {
+    await mcpServer.handleSseConnection(req, res);
+  });
+  app.post('/mcp/messages', express.json(), async (req, res) => {
+    await mcpServer.handleMessage(req, res);
+  });
 
   // 健康检查
   app.get('/health', async (req, res) => {
