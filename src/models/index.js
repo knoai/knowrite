@@ -640,12 +640,113 @@ Work.hasMany(ChapterIntent, { foreignKey: 'workId', sourceKey: 'workId', as: 'ch
 let initialized = false;
 
 async function runMigrations() {
-  // SQLite 轻量迁移：检查并添加缺失列
+  // 1. 检查并添加缺失列
   const columns = await sequelize.query("PRAGMA table_info(characters)", { type: sequelize.QueryTypes.SELECT });
   const columnNames = columns.map((c) => c.name);
   if (!columnNames.includes('voiceFingerprint')) {
     await sequelize.query("ALTER TABLE characters ADD COLUMN voiceFingerprint JSON");
     console.log('[migration] 已添加 characters.voiceFingerprint 列');
+  }
+
+  // 2. 修复 work_files filename 全局 UNIQUE（旧 schema 遗留问题）
+  const [wfIndexes] = await sequelize.query("PRAGMA index_list('work_files')");
+  const filenameUniqueIndex = wfIndexes.find((i) => i.unique === 1 && i.origin === 'u');
+  if (filenameUniqueIndex) {
+    const [indexInfo] = await sequelize.query(`PRAGMA index_info('${filenameUniqueIndex.name}')`);
+    const indexColumns = indexInfo.map((i) => i.name);
+    if (indexColumns.length === 1 && indexColumns[0] === 'filename') {
+      console.log('[migration] 检测到 work_files.filename 全局 UNIQUE，开始重建表...');
+      await sequelize.transaction(async (t) => {
+        await sequelize.query(`
+          CREATE TABLE work_files_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workId VARCHAR(255) NOT NULL,
+            filename VARCHAR(255) NOT NULL,
+            content TEXT DEFAULT '',
+            createdAt DATETIME NOT NULL,
+            updatedAt DATETIME NOT NULL
+          )
+        `, { transaction: t });
+        await sequelize.query(`
+          INSERT INTO work_files_new (id, workId, filename, content, createdAt, updatedAt)
+          SELECT id, workId, filename, content, createdAt, updatedAt FROM work_files
+        `, { transaction: t });
+        await sequelize.query(`DROP TABLE work_files`, { transaction: t });
+        await sequelize.query(`ALTER TABLE work_files_new RENAME TO work_files`, { transaction: t });
+        await sequelize.query(`CREATE UNIQUE INDEX work_files_work_id_filename ON work_files (workId, filename)`, { transaction: t });
+        await sequelize.query(`CREATE INDEX work_files_work_id ON work_files (workId)`, { transaction: t });
+      });
+      console.log('[migration] work_files 重建完成');
+    }
+  }
+
+  // 3. 修复 volumes workId/number 全局 UNIQUE（旧 schema 遗留问题）
+  const [volIndexes] = await sequelize.query("PRAGMA index_list('volumes')");
+  const volUniqueIndexes = volIndexes.filter((i) => i.unique === 1 && i.origin === 'u');
+  if (volUniqueIndexes.length > 0) {
+    const needsRebuild = volUniqueIndexes.some((idx) => {
+      // 简单检查：如果存在 origin='u' 的唯一索引，说明有旧 schema 问题
+      return true;
+    });
+    if (needsRebuild) {
+      console.log('[migration] 检测到 volumes 旧 UNIQUE 约束，开始重建表...');
+      await sequelize.transaction(async (t) => {
+        await sequelize.query(`
+          CREATE TABLE volumes_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            workId VARCHAR(255) NOT NULL,
+            number INTEGER NOT NULL,
+            title VARCHAR(255) DEFAULT '',
+            outlineFile VARCHAR(255) DEFAULT '',
+            chapterRange JSON DEFAULT '[]',
+            status VARCHAR(255) DEFAULT 'outlined'
+          )
+        `, { transaction: t });
+        await sequelize.query(`
+          INSERT INTO volumes_new (id, workId, number, title, outlineFile, chapterRange, status)
+          SELECT id, workId, number, title, outlineFile, chapterRange, status FROM volumes
+        `, { transaction: t });
+        await sequelize.query(`DROP TABLE volumes`, { transaction: t });
+        await sequelize.query(`ALTER TABLE volumes_new RENAME TO volumes`, { transaction: t });
+        await sequelize.query(`CREATE UNIQUE INDEX volumes_work_id_number ON volumes (workId, number)`, { transaction: t });
+      });
+      console.log('[migration] volumes 重建完成');
+    }
+  }
+
+  // 4. 修复 chapters workId/number 全局 UNIQUE（旧 schema 遗留问题）
+  const [chIndexes] = await sequelize.query("PRAGMA index_list('chapters')");
+  const chUniqueIndexes = chIndexes.filter((i) => i.unique === 1 && i.origin === 'u');
+  if (chUniqueIndexes.length > 0) {
+    console.log('[migration] 检测到 chapters 旧 UNIQUE 约束，开始重建表...');
+    await sequelize.transaction(async (t) => {
+      await sequelize.query(`
+        CREATE TABLE chapters_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          workId VARCHAR(255) NOT NULL,
+          number INTEGER NOT NULL,
+          rawFile VARCHAR(255) DEFAULT '',
+          editedFile VARCHAR(255) DEFAULT '',
+          humanizedFile VARCHAR(255) DEFAULT '',
+          finalFile VARCHAR(255) DEFAULT '',
+          polishFile VARCHAR(255) DEFAULT '',
+          feedbackFile VARCHAR(255) DEFAULT '',
+          summaryFile VARCHAR(255) DEFAULT '',
+          editFile VARCHAR(255) DEFAULT '',
+          repetitionRepairedFile VARCHAR(255) DEFAULT '',
+          chars INTEGER DEFAULT 0,
+          models JSON DEFAULT '{}'
+        )
+      `, { transaction: t });
+      await sequelize.query(`
+        INSERT INTO chapters_new (id, workId, number, rawFile, editedFile, humanizedFile, finalFile, polishFile, feedbackFile, summaryFile, editFile, repetitionRepairedFile, chars, models)
+        SELECT id, workId, number, rawFile, editedFile, humanizedFile, finalFile, polishFile, feedbackFile, summaryFile, editFile, repetitionRepairedFile, chars, models FROM chapters
+      `, { transaction: t });
+      await sequelize.query(`DROP TABLE chapters`, { transaction: t });
+      await sequelize.query(`ALTER TABLE chapters_new RENAME TO chapters`, { transaction: t });
+      await sequelize.query(`CREATE UNIQUE INDEX chapters_work_id_number ON chapters (workId, number)`, { transaction: t });
+    });
+    console.log('[migration] chapters 重建完成');
   }
 }
 

@@ -18,6 +18,7 @@ const {
   resolveRoleModelConfig,
   getWritingMode,
   resolveWriterModel,
+  getConfig,
 } = require('../settings-store');
 const editReviewer = require('./edit-reviewer');
 const outlineGenerator = require('./outline-generator');

@@ -69,7 +69,13 @@ function invalidateWorkCache(workId) {
 async function writeFile(workId, filename, content) {
   await initDb();
   const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
-  await WorkFile.upsert({ workId, filename, content: text });
+  const existing = await WorkFile.findOne({ where: { workId, filename } });
+  if (existing) {
+    existing.content = text;
+    await existing.save();
+  } else {
+    await WorkFile.create({ workId, filename, content: text });
+  }
   setCached(workId, filename, text);
 }
 
@@ -126,8 +132,7 @@ async function appendToFile(workId, filename, content) {
   await initDb();
   const existing = await readFile(workId, filename);
   const updated = existing + content;
-  await WorkFile.upsert({ workId, filename, content: updated });
-  setCached(workId, filename, updated);
+  await writeFile(workId, filename, updated);
 }
 
 async function deleteFile(workId, filename) {

@@ -82,7 +82,13 @@ async function loadMeta(workId) {
 async function saveMeta(workId, meta) {
   await initDb();
   const { volumes, chapters, ...workData } = meta;
-  await Work.upsert({ ...workData, workId });
+  try {
+    await Work.upsert({ ...workData, workId });
+  } catch (err) {
+    const fields = err.errors?.map(e => `${e.path}=${JSON.stringify(e.value)}(${e.message})`)?.join(', ');
+    console.error(`[novel-engine] saveMeta error: name=${err.name} workId=${workId} fields=[${fields || 'N/A'}] msg=${err.message}`);
+    throw err;
+  }
   if (volumes && volumes.length) {
     for (const vol of volumes) {
       await Volume.upsert({ ...vol, workId });
