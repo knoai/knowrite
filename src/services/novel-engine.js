@@ -233,17 +233,63 @@ async function deleteWork(workId) {
     return { success: true };
   }
 
-  // 1. 删除 DB 中的关联数据（Sequelize 外键级联）
-  await Work.destroy({ where: { workId } });
+  const transaction = await sequelize.transaction();
+  try {
+    // 按外键依赖顺序删除子表（先叶子节点，后父节点）
+    const deleteOrder = [
+      'plot_nodes',          // 依赖 plot_lines
+      'plot_lines',
+      'character_relations', // 依赖 characters
+      'character_memories',  // 有 ON DELETE CASCADE，但显式删除更安全
+      'map_connections',     // 依赖 map_regions
+      'work_template_links', // 依赖 story_templates
+      'work_style_links',    // 有 ON DELETE CASCADE
+      'truth_events',        // 有 ON DELETE CASCADE
+      'truth_states',        // 有 ON DELETE CASCADE
+      'truth_hooks',         // 有 ON DELETE CASCADE
+      'truth_resources',     // 有 ON DELETE CASCADE
+      'embeddings',          // 有 ON DELETE CASCADE
+      'world_lore',
+      'characters',
+      'map_regions',
+      'author_intents',
+      'current_focuses',
+      'chapter_intents',
+      'output_queue',
+      'work_files',
+      'chapters',
+      'volumes',
+    ];
 
-  // 2. 删除 fileStore 中的所有作品文件
+    for (const table of deleteOrder) {
+      try {
+        await sequelize.query(
+          `DELETE FROM ${table} WHERE workId = ?`,
+          { replacements: [workId], transaction }
+        );
+      } catch (err) {
+        // 表不存在或没有 workId 列时跳过
+        console.warn(`[novel-engine] 删除 ${table} 时跳过: ${err.message}`);
+      }
+    }
+
+    // 删除主表记录
+    await Work.destroy({ where: { workId }, transaction });
+
+    await transaction.commit();
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+
+  // 删除 fileStore 中的所有作品文件
   try {
     await fileStore.deleteAllWorkFiles(workId);
   } catch (err) {
     console.error(`[novel-engine] 删除作品文件存储失败: ${workId}`, err.message);
   }
 
-  // 3. 删除本地作品目录
+  // 删除本地作品目录
   const workDir = getWorkDir(workId);
   try {
     await fs.promises.rm(workDir, { recursive: true, force: true });
