@@ -648,7 +648,7 @@ async function correctOutlineDeviation(workId, chapterNumber, model, callbacks) 
   const prompt = `你是一位职业作家。以下第${chapterNumber}章偏离了当前大纲，请对其进行矫正重写，使其严格贴合大纲走向，同时保持情节连贯和原有风格。\n\n大纲：\n${outline}\n\n当前章节：\n${text}\n\n请直接输出矫正后的完整章节。`;
   const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('deviationCheck', model), {
     onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk(`correct_${chapterNumber}`, chunk); }
-  });
+  }, { workId, agentType: 'deviationCheck', promptTemplate: 'outline-correct.md' });
   if (callbacks?.onStepEnd) callbacks.onStepEnd(`correct_${chapterNumber}`, result);
 
   const correctedFile = `chapter_${chapterNumber}_outline_corrected.txt`;
@@ -670,7 +670,7 @@ async function correctStyle(workId, chapterNumber, newStyle, model, callbacks) {
   const prompt = `你是一位职业作家。请将以下第${chapterNumber}章改写为"${newStyle}"风格，保持情节不变，只调整语言风格、句式节奏和描写方式。\n\n当前章节：\n${text}\n\n请直接输出改写后的完整章节。`;
   const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('styleCorrect', model), {
     onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk(`style_correct_${chapterNumber}`, chunk); }
-  });
+  }, { workId, agentType: 'styleCorrect', promptTemplate: 'style-correct.md' });
   if (callbacks?.onStepEnd) callbacks.onStepEnd(`style_correct_${chapterNumber}`, result);
 
   const correctedFile = `chapter_${chapterNumber}_style_corrected.txt`;

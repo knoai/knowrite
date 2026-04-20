@@ -58,7 +58,7 @@ ${summaryText}
   "rules": ["修炼境界划分", "宗门规矩"]
 }`;
 
-  const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('summarizer', model), callbacks || {});
+  const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('summarizer', model), callbacks || {}, { workId, agentType: 'summarizer', promptTemplate: 'index-extract.md' });
   let json = null;
   try {
     const cleaned = result.content.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim();
@@ -191,7 +191,7 @@ ${chapterText.substring(0, 4000)}
 
   const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('repetitionRepair', model), {
     onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk(`repetition_${chapterNumber}`, chunk); }
-  });
+  }, { workId, agentType: 'repetitionRepair', promptTemplate: 'repetition-check.md' });
 
   if (callbacks?.onStepEnd) {
     callbacks.onStepEnd(`repetition_${chapterNumber}`, { chars: result.chars, durationMs: result.durationMs });
@@ -265,7 +265,7 @@ ${chapterText}
 
   const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('repetitionRepair', model), {
     onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk(`repetition_repair_${chapterNumber}`, chunk); }
-  });
+  }, { workId, agentType: 'repetitionRepair', promptTemplate: 'repetition-repair.md' });
 
   if (callbacks?.onStepEnd) {
     callbacks.onStepEnd(`repetition_repair_${chapterNumber}`, { chars: result.chars, durationMs: result.durationMs });

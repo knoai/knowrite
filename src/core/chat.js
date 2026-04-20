@@ -123,6 +123,8 @@ async function runStreamChat(messages, modelConfig, callbacks, traceContext = {}
   if (traceContext.workId) {
     try {
       const engineCfg = await getConfig('engine');
+      const tracing = engineCfg.tracing || {};
+      const previewLen = tracing.previewLength || engineCfg.truncation.traceInputOutput || 500;
       const traceRecord = {
         timestamp: new Date().toISOString(),
         agentType: traceContext.agentType || 'unknown',
@@ -130,11 +132,20 @@ async function runStreamChat(messages, modelConfig, callbacks, traceContext = {}
         model: cfg.model,
         provider: cfg.provider,
         temperature: cfg.temperature,
-        inputPreview: messages.map(m => m.content).join('\n').substring(0, engineCfg.truncation.traceInputOutput),
-        outputPreview: buffer.substring(0, engineCfg.truncation.traceInputOutput),
+        inputPreview: messages.map(m => m.content).join('\n').substring(0, previewLen),
+        outputPreview: buffer.substring(0, previewLen),
         chars: result.chars,
         durationMs: result.durationMs,
       };
+      if (tracing.retainFullPrompt || tracing.retainFullOutput) {
+        const fullRecord = {
+          ...traceRecord,
+          ...(tracing.retainFullPrompt ? { inputFull: messages.map(m => m.content).join('\n') } : {}),
+          ...(tracing.retainFullOutput ? { outputFull: buffer } : {}),
+        };
+        const fullTraceFilename = `traces/${traceContext.agentType || 'unknown'}_${Date.now()}_full.json`;
+        await fileStore.writeFile(traceContext.workId, fullTraceFilename, JSON.stringify(fullRecord, null, 2));
+      }
       const traceFilename = `traces/${traceContext.agentType || 'unknown'}.jsonl`;
       const existing = await fileStore.readFile(traceContext.workId, traceFilename);
       const updated = (existing || '') + JSON.stringify(traceRecord) + '\n';

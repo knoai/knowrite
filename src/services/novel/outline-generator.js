@@ -40,7 +40,7 @@ async function generateOutline(topic, style, model, callbacks, workId = null) {
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;
   }
-  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {});
+  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {}, workId ? { workId, agentType: 'outline', promptTemplate: 'outline-theme.md' } : undefined);
 }
 
 async function generateDetailedOutline(topic, style, outlineTheme, model, callbacks, workId = null) {
@@ -50,7 +50,7 @@ async function generateDetailedOutline(topic, style, outlineTheme, model, callba
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;
   }
-  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {});
+  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {}, workId ? { workId, agentType: 'outline', promptTemplate: 'outline-detailed.md' } : undefined);
 }
 
 async function generateMultivolumeOutline(topic, style, outlineDetailed, totalVolumes, model, callbacks, workId = null) {
@@ -66,7 +66,7 @@ async function generateMultivolumeOutline(topic, style, outlineDetailed, totalVo
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;
   }
-  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {});
+  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {}, workId ? { workId, agentType: 'outline', promptTemplate: 'outline-multivolume.md' } : undefined);
 }
 
 async function generateVolumeOutline(topic, style, outlineMultivolume, volumeNumber, model, callbacks, workId = null) {
@@ -82,7 +82,7 @@ async function generateVolumeOutline(topic, style, outlineMultivolume, volumeNum
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;
   }
-  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {});
+  return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {}, workId ? { workId, agentType: 'outline', promptTemplate: 'volume-outline.md' } : undefined);
 }
 
 module.exports = {

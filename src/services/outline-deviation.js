@@ -32,7 +32,7 @@ async function detectOutlineDeviation(workId, chapterNumber, text, model) {
   if (!meta) throw new Error('作品不存在');
   const outline = await outlineGenerator.getCurrentVolumeOutline(workId, meta);
   const prompt = `你是一位资深编辑，请判断以下第${chapterNumber}章正文是否偏离了给定大纲。\n\n大纲：\n${outline}\n\n正文：\n${text.substring(0, engineCfg.truncation.deviationCheckText)}\n\n请输出 JSON：\n{"severity": "low/medium/high", "reason": "...", "suggestions": ["..."]}`;
-  const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('deviationCheck', model), {});
+  const result = await runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('deviationCheck', model), {}, { workId, agentType: 'deviationCheck', promptTemplate: 'deviation-check.md' });
   let json = null;
   try {
     json = JSON.parse(result.content.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim());

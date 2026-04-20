@@ -13,7 +13,7 @@ const { runStreamChat } = require('../../core/chat');
 const { resolveRoleModelConfig, getConfig } = require('../settings-store');
 const { expandStyle } = require('./novel-utils');
 
-async function generateChapterSummary(chapterContent, style, model, callbacks) {
+async function generateChapterSummary(chapterContent, style, model, callbacks, workId) {
   const engineCfg = await getConfig('engine');
   const prompt = await loadPrompt('summary', {
     style: await expandStyle(style),
@@ -22,7 +22,8 @@ async function generateChapterSummary(chapterContent, style, model, callbacks) {
   return runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('summarizer', model),
-    callbacks || {}
+    callbacks || {},
+    workId ? { workId, agentType: 'summarizer', promptTemplate: 'summary.md' } : undefined
   );
 }
 
@@ -40,7 +41,7 @@ async function runFitnessEvaluation(workId, chapterNumber, chars) {
   }
 }
 
-async function generateReaderFeedback(chapterContent, style, model, callbacks) {
+async function generateReaderFeedback(chapterContent, style, model, callbacks, workId) {
   const is10s = style.includes('10后');
   const extraDims = is10s
     ? `\n6. 中二燃度评分（1-10）及理由\n7. 梗密度是否合适（过多/过少/刚好）\n8. 是否希望立刻看到下一章（是/否）及原因`
@@ -59,7 +60,8 @@ async function generateReaderFeedback(chapterContent, style, model, callbacks) {
   return runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('reader', model),
-    callbacks || {}
+    callbacks || {},
+    workId ? { workId, agentType: 'reader', promptTemplate: 'reader-feedback.md' } : undefined
   );
 }
 

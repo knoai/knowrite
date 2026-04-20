@@ -27,6 +27,7 @@ async function deconstruct(text, options = {}) {
     model,
     maxSampleChars = 15000,
     callbacks = {},
+    workId,
   } = options;
 
   // 1. 文本预处理
@@ -46,9 +47,9 @@ async function deconstruct(text, options = {}) {
     styleResult,
     voiceResult,
   ] = await Promise.all([
-    analyzeStructure(sampleChapters, model, callbacks),
-    analyzeCharacters(sampleChapters, model, callbacks),
-    analyzeWorld(sampleText, model, callbacks),
+    analyzeStructure(sampleChapters, model, callbacks, workId),
+    analyzeCharacters(sampleChapters, model, callbacks, workId),
+    analyzeWorld(sampleText, model, callbacks, workId),
     analyzeStyle(sampleText, model, callbacks),
     analyzeVoices(sampleChapters, model, callbacks),
   ]);
@@ -63,7 +64,7 @@ async function deconstruct(text, options = {}) {
     characters: charactersResult,
     world: worldResult,
     style: styleResult,
-  }, model, callbacks);
+  }, model, callbacks, workId);
 
   const result = {
     meta: { title, author, genre: structureResult.genre || '未知', totalChars: text.length, chapterCount: chapters.length },
@@ -84,7 +85,7 @@ async function deconstruct(text, options = {}) {
 
 // ============ 各维度分析 ============
 
-async function analyzeStructure(chapters, model, callbacks) {
+async function analyzeStructure(chapters, model, callbacks, workId) {
   const sample = chapters.map((c, i) => `第${i + 1}章：${c.title}\n${c.content.substring(0, 800)}`).join('\n\n---\n\n');
 
   const prompt = `你是一位资深网络文学编辑，擅长分析小说的结构和套路。请对以下章节样本进行结构分析。\n\n章节样本：\n${sample}\n\n请输出 JSON（不要加 markdown 代码块）：\n{\n  "genre": "题材标签（如：都市修仙/玄幻/言情等）",\n  "beatStructure": [\n    { "beat": "开局钩子", "description": "如何吸引读者", "position": "第1-3章" },\n    { "beat": "冲突升级", "description": "...", "position": "第4-10章" }\n  ],\n  "hookPattern": "每章结尾的钩子模式（如：悬念/冲突/反转）",\n  "conflictTypes": ["主要冲突类型1", "主要冲突类型2"],\n  "pacing": {\n    "early": "开局节奏（快/慢/适中）",\n    "mid": "中段节奏",\n    "late": "推测后期节奏"\n  },\n  "turningPoints": ["第X章 重大转折1", "第X章 重大转折2"],\n  "cliffhangerStyle": "悬念风格描述",\n  "recommendedTemplate": "建议的套路模板名称"\n}`;
@@ -92,13 +93,14 @@ async function analyzeStructure(chapters, model, callbacks) {
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('editor', model),
-    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_structure', chunk); } }
+    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_structure', chunk); } },
+    workId ? { workId, agentType: 'deconstruct', promptTemplate: 'deconstruct-structure.md' } : undefined
   );
 
   return extractJson(result.content) || {};
 }
 
-async function analyzeCharacters(chapters, model, callbacks) {
+async function analyzeCharacters(chapters, model, callbacks, workId) {
   const sample = chapters.map((c, i) => `第${i + 1}章：${c.title}\n${c.content.substring(0, 600)}`).join('\n\n---\n\n');
 
   const prompt = `你是一位人物设定专家。请从以下章节样本中提取所有重要人物，并分析其设定和关系。\n\n章节样本：\n${sample}\n\n请输出 JSON（不要加 markdown 代码块）：\n{\n  "characters": [\n    {\n      "name": "角色名",\n      "roleType": "主角/配角/反派",\n      "alias": "别名/称号",\n      "appearance": "外貌特征",\n      "personality": "性格特点",\n      "goals": "目标/动机",\n      "background": "背景故事",\n      "relationships": [\n        { "target": "关系对象", "type": "师徒/敌对/恋人/亲人", "description": "关系描述" }\n      ]\n    }\n  ]\n}`;
@@ -106,20 +108,22 @@ async function analyzeCharacters(chapters, model, callbacks) {
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('editor', model),
-    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_characters', chunk); } }
+    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_characters', chunk); } },
+    workId ? { workId, agentType: 'deconstruct', promptTemplate: 'deconstruct-characters.md' } : undefined
   );
 
   const data = extractJson(result.content) || {};
   return data.characters || [];
 }
 
-async function analyzeWorld(sampleText, model, callbacks) {
+async function analyzeWorld(sampleText, model, callbacks, workId) {
   const prompt = `你是一位世界观设定专家。请从以下小说文本中提取世界观设定。\n\n文本样本：\n${sampleText.substring(0, 6000)}\n\n请输出 JSON（不要加 markdown 代码块）：\n{\n  "worldLore": [\n    { "category": "力量体系/种族/势力/历史/规则/道具/地理/其他", "title": "设定名称", "content": "详细描述", "tags": ["标签1"], "importance": 1-5 }\n  ],\n  "mapRegions": [\n    { "name": "区域名", "regionType": "大陆/国家/城市/宗门/秘境", "parentName": "上级区域", "description": "描述" }\n  ],\n  "plotLines": [\n    { "name": "剧情线名称", "type": "主线/支线", "nodes": [{ "title": "节点名", "description": "描述", "nodeType": "开端/发展/高潮/结局" }] }\n  ]\n}`;
 
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('outline', model),
-    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_world', chunk); } }
+    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_world', chunk); } },
+    workId ? { workId, agentType: 'deconstruct', promptTemplate: 'deconstruct-world.md' } : undefined
   );
 
   const data = extractJson(result.content) || {};
@@ -167,13 +171,14 @@ async function analyzeVoices(chapters, model, callbacks) {
   return results;
 }
 
-async function generateSummary(analysis, model, callbacks) {
+async function generateSummary(analysis, model, callbacks, workId) {
   const prompt = `请根据以下拆书分析结果，生成一份结构化的拆书总结报告。\n\n作品：${analysis.title}\n章节数：${analysis.chapterCount}\n总字数：${analysis.totalChars}\n\n结构分析：\n${JSON.stringify(analysis.structure, null, 2)}\n\n人物数量：${analysis.characters.length}\n世界观条目：${analysis.world.worldLore.length}\n\n请输出一份面向作者的拆书报告，包含：\n1. 作品整体评价（100字）\n2. 可学习的亮点（3-5条）\n3. 可复用的套路/技巧（3-5条）\n4. 适合模仿的风格特征（3-5条）`;
 
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('editor', model),
-    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_summary', chunk); } }
+    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('deconstruct_summary', chunk); } },
+    workId ? { workId, agentType: 'deconstruct', promptTemplate: 'deconstruct-summary.md' } : undefined
   );
 
   return result.content;
@@ -217,7 +222,7 @@ async function createArtifacts(analysis, options = {}) {
   }
 
   // 3. 创建 Prompt
-  const promptContent = await generateWriterPromptFromAnalysis(analysis, options.model);
+  const promptContent = await generateWriterPromptFromAnalysis(analysis, options.model, options.workId);
   if (promptContent) {
     const [promptRow] = await Prompt.findOrCreate({
       where: { name: `deconstructed_${Date.now()}`, lang: 'zh' },
@@ -233,12 +238,14 @@ async function createArtifacts(analysis, options = {}) {
   return artifacts;
 }
 
-async function generateWriterPromptFromAnalysis(analysis, model) {
+async function generateWriterPromptFromAnalysis(analysis, model, workId) {
   const prompt = `请根据以下拆书分析结果，生成一段可以直接用于 Writer Agent 的系统提示词（System Prompt）。\n\n作品：${analysis.meta.title}\n题材：${analysis.structure.genre || '未知'}\n\n结构模板：\n${JSON.stringify(analysis.structure.beatStructure, null, 2)}\n\n语言风格特征：\n- 平均句长：${analysis.style.languageLayer?.avgSentenceLength?.toFixed(1) || '未知'} 字\n- 对话占比：${((analysis.style.languageLayer?.dialogueRatio || 0) * 100).toFixed(1)}%\n- 叙事视角：${analysis.style.narrativeLayer?.povPreference || '未知'}\n- 章节结尾：${analysis.style.narrativeLayer?.chapterEndingStyle || '未知'}\n\n请输出一段 300-500 字的 Writer 系统提示词，要求：\n1. 明确指定该作品的风格特征\n2. 包含结构模板要求\n3. 包含对话和叙事的具体指令\n4. 可以直接作为 {{style}} 变量注入到 writer.md 中`;
 
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
-    await resolveRoleModelConfig('editor', model)
+    await resolveRoleModelConfig('editor', model),
+    {},
+    workId ? { workId, agentType: 'deconstruct', promptTemplate: 'deconstruct-prompt.md' } : undefined
   );
 
   return result.content;

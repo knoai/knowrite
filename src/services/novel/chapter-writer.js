@@ -37,6 +37,8 @@ const {
   runFitnessEvaluation,
   extractTruthDeltaFromSummary,
 } = require('./chapter-processor');
+const { planChapterBeats } = require('./chapter-planner');
+const { loadRecentFitness } = require('../fitness-evaluator');
 
 
 
@@ -61,10 +63,51 @@ async function appendToFullTxt(workId, sectionTitle, content) {
   }
 }
 
+// ============ AutoSkip 逻辑 ============
+
+async function shouldAutoSkip(workId, stageKey, autoSkip, isFreeMode) {
+  if (!autoSkip || !autoSkip[stageKey]) return false;
+  const rule = autoSkip[stageKey];
+
+  // 自由风自动跳过
+  if (rule.ifFreeMode && isFreeMode) {
+    console.log(`[pipeline] 第${stageKey}阶段 自动跳过（自由风模式）`);
+    return true;
+  }
+
+  // Fitness 历史自动跳过
+  if (rule.ifLastFitness) {
+    const match = rule.ifLastFitness.match(/^([<>]=?)\s*([\d.]+)$/);
+    if (match) {
+      const op = match[1];
+      const threshold = parseFloat(match[2]);
+      const recent = await loadRecentFitness(workId, rule.consecutive || 1);
+      if (recent.length >= (rule.consecutive || 1)) {
+        const allMatch = recent.every((f) => {
+          const score = f.score ?? f.fitnessScore ?? 0;
+          if (op === '>') return score > threshold;
+          if (op === '>=') return score >= threshold;
+          if (op === '<') return score < threshold;
+          if (op === '<=') return score <= threshold;
+          return false;
+        });
+        if (allMatch) {
+          console.log(`[pipeline] 第${stageKey}阶段 自动跳过（最近${recent.length}章 Fitness ${rule.ifLastFitness}）`);
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 // ============ 7-Agent 多智能体流程 ============
 
 async function writeChapterMultiAgent(workId, meta, nextNumber, models, callbacks) {
   const engineCfg = await getConfig('engine');
+  const pipelineCfg = engineCfg.pipeline || {};
+  const stages = pipelineCfg.stages || {};
   const style =
     (await expandStyle(meta.platformStyle, meta.authorStyle)) || (await expandStyle(meta.style));
   const topic = meta.topic;
@@ -84,8 +127,21 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   const worldContext = await getWorldContextForPrompt(workId, nextNumber);
   const isFreeMode = (await getWritingMode(workId)) === 'free';
   const MAX_EDIT_ROUNDS = isFreeMode
-    ? engineCfg.editing.maxEditRoundsFree
-    : engineCfg.editing.maxEditRounds;
+    ? (stages.editor?.maxRounds ?? engineCfg.editing.maxEditRoundsFree)
+    : (stages.editor?.maxRounds ?? engineCfg.editing.maxEditRounds);
+
+  // ===== Plan 模式：章节节拍规划 =====
+  let chapterPlan = null;
+  if (pipelineCfg.plan?.enabled) {
+    try {
+      chapterPlan = await planChapterBeats(workId, meta, nextNumber, models, callbacks);
+      if (chapterPlan) {
+        console.log(`[chapter-writer] 第${nextNumber}章 节拍规划完成，beats=${chapterPlan.beats?.length || 0}`);
+      }
+    } catch (err) {
+      console.error(`[chapter-writer] 第${nextNumber}章 节拍规划失败（继续写作）:`, err.message);
+    }
+  }
 
   // ===== 输入治理：plan + compose =====
   let governanceVars = null;
@@ -156,6 +212,19 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     }
   }
 
+  // Plan 模式：注入节拍规划到 Writer prompt
+  if (chapterPlan && chapterPlan.beats && chapterPlan.beats.length > 0) {
+    const beatsText = chapterPlan.beats.map((b, i) =>
+      `${i + 1}. [${b.type}] ${b.description}（约${b.estimatedWords || '?'}字）`
+    ).join('\n');
+    writerPrompt +=
+      '\n\n========== 本章节拍规划 ==========\n' +
+      `整体基调：${chapterPlan.overallTone || '未指定'}\n\n` +
+      `叙事节拍：\n${beatsText}\n` +
+      (chapterPlan.riskFlags?.length ? `\n风险提示：${chapterPlan.riskFlags.join('、')}\n` : '') +
+      '========== 本章节拍规划结束 ==========';
+  }
+
   console.log(`[prompt-trace] Writer 最终提交：model=${models.writer}, prompt长度=${writerPrompt.length}`);
   const rawResult = await runStreamChat(
     [{ role: 'user', content: writerPrompt }],
@@ -171,6 +240,10 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   if (callbacks.onStepEnd) callbacks.onStepEnd(`raw_${nextNumber}`, rawResult);
 
   // 2. 编辑-作者改循环，直到编辑通过或达到最大轮次
+  if (stages.editor?.enabled === false) {
+    console.log(`[pipeline] 第${nextNumber}章 Editor 已禁用，跳过审阅`);
+    await writeFile(workId, `chapter_${nextNumber}_edit.txt`, rawResult.content);
+  } else {
   let currentDraft = rawResult.content;
   let lastEditResult = null;
   let lastEditedResult = null;
@@ -310,7 +383,8 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
           onChunk: (chunk) => {
             if (callbacks.onChunk) callbacks.onChunk(editedKey, chunk);
           },
-        }
+        },
+        { workId, agentType: 'revise', promptTemplate: 'revise.md' }
       );
       lastEditedResult = editedResult;
       currentDraft = editedResult.content;
@@ -335,33 +409,44 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     const finalVerdict = await editReviewer.parseEditorVerdict(lastEditResult.content);
     await editReviewer.saveEditorReviewAsJson(workId, nextNumber, lastEditResult.content, finalVerdict);
   }
+  } // <-- 闭合 stages.editor?.enabled === false 的 else 块
 
   // 3. 去AI化：风格化
-  if (callbacks.onStepStart)
-    callbacks.onStepStart({
-      key: `humanized_${nextNumber}`,
-      name: `第${nextNumber}章 去AI化`,
-      model: models.humanizer,
+  let humanizedResult;
+  if (stages.humanizer?.enabled === false || await shouldAutoSkip(workId, 'humanizer', pipelineCfg.autoSkip, isFreeMode)) {
+    console.log(`[pipeline] 第${nextNumber}章 Humanizer 已禁用，跳过`);
+    humanizedResult = lastEditedResult;
+    await writeFile(workId, `chapter_${nextNumber}_humanized.txt`, humanizedResult.content);
+  } else {
+    if (callbacks.onStepStart)
+      callbacks.onStepStart({
+        key: `humanized_${nextNumber}`,
+        name: `第${nextNumber}章 去AI化`,
+        model: models.humanizer,
+      });
+    const humanizePrompt = await loadPrompt(await resolvePromptName('humanizer', workId), {
+      style,
+      content: lastEditedResult.content,
     });
-  const humanizePrompt = await loadPrompt(await resolvePromptName('humanizer', workId), {
-    style,
-    content: lastEditedResult.content,
-  });
-  const humanizedResult = await runStreamChat(
-    [{ role: 'user', content: humanizePrompt }],
-    await resolveRoleModelConfig('humanizer', models.humanizer),
-    {
-      onChunk: (chunk) => {
-        if (callbacks.onChunk) callbacks.onChunk(`humanized_${nextNumber}`, chunk);
+    humanizedResult = await runStreamChat(
+      [{ role: 'user', content: humanizePrompt }],
+      await resolveRoleModelConfig('humanizer', models.humanizer),
+      {
+        onChunk: (chunk) => {
+          if (callbacks.onChunk) callbacks.onChunk(`humanized_${nextNumber}`, chunk);
+        },
       },
-    }
-  );
-  await writeFile(workId, `chapter_${nextNumber}_humanized.txt`, humanizedResult.content);
-  if (callbacks.onStepEnd) callbacks.onStepEnd(`humanized_${nextNumber}`, humanizedResult);
+      { workId, agentType: 'humanizer', promptTemplate: 'humanizer.md' }
+    );
+    await writeFile(workId, `chapter_${nextNumber}_humanized.txt`, humanizedResult.content);
+    if (callbacks.onStepEnd) callbacks.onStepEnd(`humanized_${nextNumber}`, humanizedResult);
+  }
 
-  // 5. 校编：校对（自由风跳过）
+  // 5. 校编：校对（自由风跳过，或 pipeline 配置禁用，或 autoSkip）
   let finalResult;
-  if (isFreeMode) {
+  const skipProofreader = isFreeMode || stages.proofreader?.enabled === false || (stages.proofreader?.skipIfFreeMode && isFreeMode) || await shouldAutoSkip(workId, 'proofreader', pipelineCfg.autoSkip, isFreeMode);
+  if (skipProofreader) {
+    console.log(`[pipeline] 第${nextNumber}章 Proofreader 已跳过（自由风或禁用）`);
     finalResult = humanizedResult;
     await writeFile(workId, `chapter_${nextNumber}_final.txt`, finalResult.content);
     await appendToFullTxt(workId, `第${nextNumber}章`, finalResult.content);
@@ -382,7 +467,8 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
         onChunk: (chunk) => {
           if (callbacks.onChunk) callbacks.onChunk(`final_${nextNumber}`, chunk);
         },
-      }
+      },
+      { workId, agentType: 'proofreader', promptTemplate: 'proofreader.md' }
     );
     await writeFile(workId, `chapter_${nextNumber}_final.txt`, finalResult.content);
     await appendToFullTxt(workId, `第${nextNumber}章`, finalResult.content);
@@ -390,35 +476,49 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   }
 
   // 6. 读者：反馈
-  if (callbacks.onStepStart)
-    callbacks.onStepStart({
-      key: `feedback_${nextNumber}`,
-      name: `第${nextNumber}章 读者反馈`,
-      model: models.reader,
-    });
-  const feedbackResult = await generateReaderFeedback(finalResult.content, style, models.reader, {
-    onChunk: (chunk) => {
-      if (callbacks.onChunk) callbacks.onChunk(`feedback_${nextNumber}`, chunk);
-    },
-  });
-  let feedbackJson = feedbackResult.content;
-  // 尝试去掉 markdown 代码块
-  feedbackJson = feedbackJson.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim();
-  await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackJson);
-  if (callbacks.onStepEnd) callbacks.onStepEnd(`feedback_${nextNumber}`, feedbackResult);
+  let feedbackResult;
+  if (stages.reader?.enabled === false) {
+    console.log(`[pipeline] 第${nextNumber}章 Reader 已禁用，跳过`);
+    feedbackResult = { content: '{"skipped":true}' };
+    await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackResult.content);
+  } else {
+    if (callbacks.onStepStart)
+      callbacks.onStepStart({
+        key: `feedback_${nextNumber}`,
+        name: `第${nextNumber}章 读者反馈`,
+        model: models.reader,
+      });
+    feedbackResult = await generateReaderFeedback(finalResult.content, style, models.reader, {
+      onChunk: (chunk) => {
+        if (callbacks.onChunk) callbacks.onChunk(`feedback_${nextNumber}`, chunk);
+      },
+    }, workId);
+    let feedbackJson = feedbackResult.content;
+    // 尝试去掉 markdown 代码块
+    feedbackJson = feedbackJson.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim();
+    await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackJson);
+    if (callbacks.onStepEnd) callbacks.onStepEnd(`feedback_${nextNumber}`, feedbackResult);
+  }
 
   // 7. 摘要
-  if (callbacks.onStepStart)
-    callbacks.onStepStart({
-      key: `summary_${nextNumber}`,
-      name: `第${nextNumber}章 摘要`,
-      model: models.summarizer,
-    });
-  const summaryResult = await generateChapterSummary(finalResult.content, style, models.summarizer, {
-    onChunk: (chunk) => {
-      if (callbacks.onChunk) callbacks.onChunk(`summary_${nextNumber}`, chunk);
-    },
-  });
+  let summaryResult;
+  if (stages.summarizer?.enabled === false) {
+    console.log(`[pipeline] 第${nextNumber}章 Summarizer 已禁用，跳过`);
+    summaryResult = { content: `第${nextNumber}章摘要（Summarizer 已禁用）` };
+    await writeFile(workId, `chapter_${nextNumber}_summary.txt`, summaryResult.content);
+  } else {
+    if (callbacks.onStepStart)
+      callbacks.onStepStart({
+        key: `summary_${nextNumber}`,
+        name: `第${nextNumber}章 摘要`,
+        model: models.summarizer,
+      });
+    summaryResult = await generateChapterSummary(finalResult.content, style, models.summarizer, {
+      onChunk: (chunk) => {
+        if (callbacks.onChunk) callbacks.onChunk(`summary_${nextNumber}`, chunk);
+      },
+    }, workId);
+  }
   await writeFile(workId, `chapter_${nextNumber}_summary.txt`, summaryResult.content);
   if (callbacks.onStepEnd) callbacks.onStepEnd(`summary_${nextNumber}`, summaryResult);
 
@@ -515,9 +615,24 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
 
 async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks) {
   const engineCfg = await getConfig('engine');
+  const pipelineCfg = engineCfg.pipeline || {};
+  const stages = pipelineCfg.stages || {};
   const style =
     (await expandStyle(meta.platformStyle, meta.authorStyle)) || (await expandStyle(meta.style));
   const outlineDetailed = outlineGenerator.getCurrentVolumeOutline(workId, meta);
+
+  // ===== Plan 模式：章节节拍规划 =====
+  let chapterPlan = null;
+  if (pipelineCfg.plan?.enabled) {
+    try {
+      chapterPlan = await planChapterBeats(workId, meta, nextNumber, models, callbacks);
+      if (chapterPlan) {
+        console.log(`[chapter-writer] 第${nextNumber}章 节拍规划完成，beats=${chapterPlan.beats?.length || 0}`);
+      }
+    } catch (err) {
+      console.error(`[chapter-writer] 第${nextNumber}章 节拍规划失败（继续写作）:`, err.message);
+    }
+  }
   const { fullContext: previousContext } = await contextBuilder.buildSmartContext(
     workId,
     meta,
@@ -591,6 +706,19 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
     }
   }
 
+  // Plan 模式：注入节拍规划到 Writer prompt
+  if (chapterPlan && chapterPlan.beats && chapterPlan.beats.length > 0) {
+    const beatsText = chapterPlan.beats.map((b, i) =>
+      `${i + 1}. [${b.type}] ${b.description}（约${b.estimatedWords || '?'}字）`
+    ).join('\n');
+    chapterPrompt +=
+      '\n\n========== 本章节拍规划 ==========\n' +
+      `整体基调：${chapterPlan.overallTone || '未指定'}\n\n` +
+      `叙事节拍：\n${beatsText}\n` +
+      (chapterPlan.riskFlags?.length ? `\n风险提示：${chapterPlan.riskFlags.join('、')}\n` : '') +
+      '========== 本章节拍规划结束 ==========';
+  }
+
   const chapterResult = await runStreamChat(
     [{ role: 'user', content: chapterPrompt }],
     await resolveWriterModel(nextNumber, models.writer),
@@ -604,9 +732,11 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
   await writeFile(workId, `chapter_${nextNumber}.txt`, chapterResult.content);
   if (callbacks.onStepEnd) callbacks.onStepEnd(`chapter_${nextNumber}`, chapterResult);
 
-  // 润色（自由风跳过，直接writer输出）
+  // 润色（自由风跳过，或 pipeline 配置禁用，或 autoSkip）
   let polishResult;
-  if (isFreeMode) {
+  const skipPolish = isFreeMode || stages.polish?.enabled === false || (stages.polish?.skipIfFreeMode && isFreeMode) || await shouldAutoSkip(workId, 'polish', pipelineCfg.autoSkip, isFreeMode);
+  if (skipPolish) {
+    console.log(`[pipeline] 第${nextNumber}章 Polish 已跳过（自由风或禁用）`);
     polishResult = chapterResult;
     await writeFile(workId, `chapter_${nextNumber}_polish.txt`, polishResult.content);
     await appendToFullTxt(workId, `第${nextNumber}章`, polishResult.content);
@@ -628,7 +758,8 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
         onChunk: (chunk) => {
           if (callbacks.onChunk) callbacks.onChunk(`polish_${nextNumber}`, chunk);
         },
-      }
+      },
+      { workId, agentType: 'polish', promptTemplate: 'polish.md' }
     );
     await writeFile(workId, `chapter_${nextNumber}_polish.txt`, polishResult.content);
     await appendToFullTxt(workId, `第${nextNumber}章`, polishResult.content);
@@ -636,36 +767,50 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
   }
 
   // 读者反馈
-  if (callbacks.onStepStart)
-    callbacks.onStepStart({
-      key: `feedback_${nextNumber}`,
-      name: `第${nextNumber}章 读者反馈`,
-      model: models.reader,
-    });
-  const feedbackResult = await generateReaderFeedback(polishResult.content, style, models.reader, {
-    onChunk: (chunk) => {
-      if (callbacks.onChunk) callbacks.onChunk(`feedback_${nextNumber}`, chunk);
-    },
-  });
-  let feedbackJson = feedbackResult.content;
-  feedbackJson = feedbackJson.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim();
-  await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackJson);
-  if (callbacks.onStepEnd) callbacks.onStepEnd(`feedback_${nextNumber}`, feedbackResult);
+  let feedbackResult;
+  if (stages.reader?.enabled === false) {
+    console.log(`[pipeline] 第${nextNumber}章 Reader 已禁用，跳过`);
+    feedbackResult = { content: '{"skipped":true}' };
+    await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackResult.content);
+  } else {
+    if (callbacks.onStepStart)
+      callbacks.onStepStart({
+        key: `feedback_${nextNumber}`,
+        name: `第${nextNumber}章 读者反馈`,
+        model: models.reader,
+      });
+    feedbackResult = await generateReaderFeedback(polishResult.content, style, models.reader, {
+      onChunk: (chunk) => {
+        if (callbacks.onChunk) callbacks.onChunk(`feedback_${nextNumber}`, chunk);
+      },
+    }, workId);
+    let feedbackJson = feedbackResult.content;
+    feedbackJson = feedbackJson.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim();
+    await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackJson);
+    if (callbacks.onStepEnd) callbacks.onStepEnd(`feedback_${nextNumber}`, feedbackResult);
+  }
 
   // 摘要
-  if (callbacks.onStepStart)
-    callbacks.onStepStart({
-      key: `summary_${nextNumber}`,
-      name: `第${nextNumber}章 摘要`,
-      model: models.summarizer,
-    });
-  const summaryResult = await generateChapterSummary(polishResult.content, style, models.summarizer, {
-    onChunk: (chunk) => {
-      if (callbacks.onChunk) callbacks.onChunk(`summary_${nextNumber}`, chunk);
-    },
-  });
-  await writeFile(workId, `chapter_${nextNumber}_summary.txt`, summaryResult.content);
-  if (callbacks.onStepEnd) callbacks.onStepEnd(`summary_${nextNumber}`, summaryResult);
+  let summaryResult;
+  if (stages.summarizer?.enabled === false) {
+    console.log(`[pipeline] 第${nextNumber}章 Summarizer 已禁用，跳过`);
+    summaryResult = { content: `第${nextNumber}章摘要（Summarizer 已禁用）` };
+    await writeFile(workId, `chapter_${nextNumber}_summary.txt`, summaryResult.content);
+  } else {
+    if (callbacks.onStepStart)
+      callbacks.onStepStart({
+        key: `summary_${nextNumber}`,
+        name: `第${nextNumber}章 摘要`,
+        model: models.summarizer,
+      });
+    summaryResult = await generateChapterSummary(polishResult.content, style, models.summarizer, {
+      onChunk: (chunk) => {
+        if (callbacks.onChunk) callbacks.onChunk(`summary_${nextNumber}`, chunk);
+      },
+    }, workId);
+    await writeFile(workId, `chapter_${nextNumber}_summary.txt`, summaryResult.content);
+    if (callbacks.onStepEnd) callbacks.onStepEnd(`summary_${nextNumber}`, summaryResult);
+  }
 
   // 更新索引
   try {

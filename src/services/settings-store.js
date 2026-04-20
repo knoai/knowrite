@@ -331,7 +331,9 @@ async function saveModelConfig(modelConfig) {
 async function getRoleModelConfig(role) {
   const cfg = await getModelConfig();
   const defaults = cfg.roleDefaults || {};
-  const roleCfg = defaults[role] || {};
+  const agentModels = cfg.agentModels || {};
+  // agentModels（Agent 级专属配置）优先于 roleDefaults（通用默认）
+  const roleCfg = agentModels[role] || defaults[role] || {};
 
   const availableProviders = Object.keys(cfg.providers || {}).filter(
     k => cfg.providers[k] && cfg.providers[k].enabled !== false
@@ -452,6 +454,49 @@ async function resolveWriterModel(chapterNumber, override) {
   return resolveRoleModelConfig('writer', override);
 }
 
+// ============ Agent 级模型配置管理 ============
+
+async function getAgentModelConfig(role) {
+  const cfg = await getModelConfig();
+  const agentModels = cfg.agentModels || {};
+  return agentModels[role] || null;
+}
+
+async function setAgentModelConfig(role, config) {
+  const cfg = await getModelConfig();
+  cfg.agentModels = cfg.agentModels || {};
+  if (config === null || config === undefined) {
+    delete cfg.agentModels[role];
+  } else {
+    cfg.agentModels[role] = {
+      provider: config.provider || '',
+      model: config.model || '',
+      temperature: typeof config.temperature === 'number' ? config.temperature : 0.7,
+    };
+  }
+  await saveModelConfig(cfg);
+  return cfg.agentModels[role] || null;
+}
+
+async function listAgentModelConfigs() {
+  const cfg = await getModelConfig();
+  const agentModels = cfg.agentModels || {};
+  const defaults = cfg.roleDefaults || {};
+  const allRoles = new Set([...Object.keys(defaults), ...Object.keys(agentModels)]);
+  const result = {};
+  for (const role of allRoles) {
+    result[role] = agentModels[role] || null;
+  }
+  return result;
+}
+
+async function saveAgentModelConfigs(agentModels) {
+  const cfg = await getModelConfig();
+  cfg.agentModels = agentModels || {};
+  await saveModelConfig(cfg);
+  return cfg.agentModels;
+}
+
 async function buildReviewDimensionsText(stylePlaceholder = '') {
   const dims = await getReviewDimensions();
   if (!dims.length) return '';
@@ -544,6 +589,10 @@ module.exports = {
   getRoleModelConfig,
   resolveRoleModelConfig,
   resolveWriterModel,
+  getAgentModelConfig,
+  setAgentModelConfig,
+  listAgentModelConfigs,
+  saveAgentModelConfigs,
   getChapterConfig,
   saveChapterConfig,
   getWritingMode,

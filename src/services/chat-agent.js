@@ -57,7 +57,8 @@ async function chat(workId, messages, options = {}) {
       onChunk: (chunk) => {
         if (callbacks.onChunk) callbacks.onChunk('chat_agent', chunk);
       },
-    }
+    },
+    { workId, agentType: 'chatAgent', promptTemplate: 'chat-agent.md' }
   );
 
   if (callbacks.onStepEnd) {

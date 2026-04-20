@@ -5,10 +5,11 @@ const { startNovel, continueNovel, tryCreateOutline, tryCreateDetailedOutline, t
 const { expandStyle } = require('../services/novel/novel-utils');
 const { loadPrompt } = require('../services/prompt-loader');
 const { checkContentRepetition, repairContentRepetition } = require('../services/memory-index');
+const { planChapterBeats } = require('../services/novel/chapter-planner');
 const { loadFitness } = require('../services/fitness-evaluator');
 const { evolvePrompt, applyCandidate } = require('../services/prompt-evolver');
 const { listPrompts } = require('../services/prompt-loader');
-const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, switchProvider, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode, getRoleModelConfig, getModelLibrary, saveModelLibrary } = require('../services/settings-store');
+const { getSettings, saveSettings, getAuthorStyles, saveAuthorStyles, getPlatformStyles, savePlatformStyles, getReviewDimensions, saveReviewDimensions, getReviewPreset, setReviewPreset, getModelConfig, saveModelConfig, switchProvider, getChapterConfig, saveChapterConfig, getWritingMode, saveWritingMode, getRoleModelConfig, getModelLibrary, saveModelLibrary, getAgentModelConfig, setAgentModelConfig, listAgentModelConfigs, saveAgentModelConfigs, getConfig, saveConfig } = require('../services/settings-store');
 const { runStreamChat } = require('../core/chat');
 const fileStore = require('../services/file-store');
 const { readFile } = fileStore;
@@ -121,6 +122,37 @@ router.post('/continue', validateBody(continueSchema), async (req, res) => {
     }, { targetVolume });
   } catch (err) {
     sendError(stream, err, '/continue');
+  }
+});
+
+// Plan 模式：章节节拍规划
+router.post('/plan', async (req, res) => {
+  const { workId, chapterNumber, customModels } = req.body || {};
+  if (!workId) {
+    return res.status(400).json({ error: '缺少 workId' });
+  }
+  const stream = sse(res);
+
+  try {
+    const meta = await loadMeta(workId);
+    if (!meta) {
+      return res.status(404).json({ error: '作品不存在' });
+    }
+    const plan = await planChapterBeats(workId, meta, chapterNumber || (meta.chapters?.length + 1), customModels || {}, {
+      onStepStart(step) {
+        stream.send({ type: 'stepStart', step: step.key, name: step.name, model: step.model });
+      },
+      onChunk(stepKey, chunk) {
+        stream.send({ type: 'chunk', step: stepKey, chunk });
+      },
+      onStepEnd(stepKey, result) {
+        stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs });
+      },
+    });
+    stream.send({ type: 'plan', beats: plan?.beats || [], overallTone: plan?.overallTone || '', riskFlags: plan?.riskFlags || [] });
+    stream.end();
+  } catch (err) {
+    sendError(stream, err, '/plan');
   }
 });
 
@@ -570,6 +602,86 @@ router.post('/settings', async (req, res) => {
   try {
     await saveSettings(req.body);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Agent 级模型配置 API
+router.get('/settings/agent-models', async (req, res) => {
+  try {
+    const configs = await listAgentModelConfigs();
+    res.json({ success: true, agentModels: configs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/settings/agent-models/:role', async (req, res) => {
+  try {
+    const config = await getAgentModelConfig(req.params.role);
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/settings/agent-models/:role', async (req, res) => {
+  try {
+    const config = await setAgentModelConfig(req.params.role, req.body);
+    res.json({ success: true, config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/settings/agent-models/:role', async (req, res) => {
+  try {
+    await setAgentModelConfig(req.params.role, null);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/settings/agent-models', async (req, res) => {
+  try {
+    const agentModels = await saveAgentModelConfigs(req.body);
+    res.json({ success: true, agentModels });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Engine Pipeline 配置
+router.get('/engine/pipeline', async (req, res) => {
+  try {
+    const engineCfg = await getConfig('engine');
+    res.json({ success: true, pipeline: engineCfg.pipeline || {} });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/engine/pipeline', async (req, res) => {
+  try {
+    const engineCfg = await getConfig('engine');
+    const pipeline = engineCfg.pipeline || {};
+    const update = req.body || {};
+    // 安全合并：只覆盖非空/已定义字段，避免空对象清空现有配置
+    if (update.plan !== undefined) {
+      pipeline.plan = { ...(pipeline.plan || {}), ...update.plan };
+    }
+    if (update.stages !== undefined) {
+      pipeline.stages = { ...(pipeline.stages || {}), ...update.stages };
+    }
+    if (update.autoSkip !== undefined) {
+      pipeline.autoSkip = { ...(pipeline.autoSkip || {}), ...update.autoSkip };
+    }
+    if (update.mode !== undefined) pipeline.mode = update.mode;
+    engineCfg.pipeline = pipeline;
+    await saveConfig('engine', engineCfg);
+    res.json({ success: true, pipeline: engineCfg.pipeline });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

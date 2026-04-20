@@ -180,7 +180,8 @@ extractedAt: ${new Date().toISOString().split('T')[0]}
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('skillExtract', model),
-    { onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk('skill_extract', chunk); } }
+    { onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk('skill_extract', chunk); } },
+    { workId, agentType: 'skillExtract', promptTemplate: 'skill-extract.md' }
   );
 
   if (callbacks.onStepEnd) {

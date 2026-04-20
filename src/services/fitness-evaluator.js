@@ -174,8 +174,24 @@ async function loadFitness(workId, chapterNumber) {
   }
 }
 
+async function loadRecentFitness(workId, count = 5) {
+  const results = [];
+  // 先获取作品元数据来确定最大章节数（延迟 require 避免循环依赖）
+  const { loadMeta } = require('./novel-engine');
+  const meta = await loadMeta(workId);
+  const maxChapter = meta?.chapters?.length || 0;
+  for (let i = 0; i < count; i++) {
+    const chapterNumber = maxChapter - i;
+    if (chapterNumber <= 0) break;
+    const fitness = await loadFitness(workId, chapterNumber);
+    if (fitness) results.push(fitness);
+  }
+  return results;
+}
+
 module.exports = {
   evaluateChapterFitness,
   saveFitness,
   loadFitness,
+  loadRecentFitness,
 };

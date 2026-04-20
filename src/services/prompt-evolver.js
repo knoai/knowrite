@@ -75,7 +75,7 @@ async function gatherEvalDataset(workId, agentType) {
   return dataset.sort((a, b) => a.fitness - b.fitness);
 }
 
-async function analyzeFailures(promptTemplateName, lowFitnessSamples, model, callbacks) {
+async function analyzeFailures(promptTemplateName, lowFitnessSamples, model, callbacks, workId) {
   const promptText = `你是一位 Prompt 工程专家。请分析以下低质量章节的执行记录，找出当前 "${promptTemplateName}" Prompt 的核心缺陷，并提出 3-5 条针对性的改进方向。\n\n低分样本（按 Fitness 从低到高排列）：\n${lowFitnessSamples.map((s, i) => `\n--- 样本 ${i + 1} ---\nFitness: ${s.fitness}\n字数得分: ${s.breakdown?.wordScore}\n重复得分: ${s.breakdown?.repScore}\n评审得分: ${s.breakdown?.reviewScore}\n读者得分: ${s.breakdown?.readerScore}\n输入预览: ${s.trace?.inputPreview?.substring(0, 300)}\n输出预览: ${s.trace?.outputPreview?.substring(0, 300)}\n`).join('')}\n\n请输出 JSON（不要加 markdown 代码块）：\n{\n  "diagnosis": "核心缺陷总结（100字以内）",\n  "directions": [\n    "改进方向1：具体说明要增加/删除/强化的规则",\n    "改进方向2..."\n  ]\n}`;
 
   if (callbacks?.onStepStart) {
@@ -84,7 +84,7 @@ async function analyzeFailures(promptTemplateName, lowFitnessSamples, model, cal
 
   const result = await runStreamChat([{ role: 'user', content: promptText }], await resolveRoleModelConfig('promptEvolve', model), {
     onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('evolve_diagnosis', chunk); }
-  });
+  }, workId ? { workId, agentType: 'promptEvolve', promptTemplate: 'prompt-evolve-diagnosis.md' } : undefined);
 
   if (callbacks?.onStepEnd) {
     callbacks.onStepEnd('evolve_diagnosis', { chars: result.chars, durationMs: result.durationMs });
@@ -111,7 +111,7 @@ async function analyzeFailures(promptTemplateName, lowFitnessSamples, model, cal
   return json;
 }
 
-async function generateVariants(promptTemplateName, diagnosis, count, model, callbacks) {
+async function generateVariants(promptTemplateName, diagnosis, count, model, callbacks, workId) {
   const baseTemplate = await loadPromptRaw(promptTemplateName);
 
   const promptText = `你是一位 Prompt 工程专家。请基于以下诊断意见，对给定的 Prompt 模板生成 ${count} 个改进变体。\n\n诊断意见：\n${diagnosis.diagnosis}\n改进方向：\n${diagnosis.directions.map((d, i) => `${i + 1}. ${d}`).join('\n')}\n\n原始 Prompt 模板：\n---\n${baseTemplate}\n---\n\n要求：\n1. 每个变体必须保持原有的 {{变量}} 和 {{include:xxx}} 语法不变；\n2. 只对规则/指令/示例部分进行微调，不要重写整个 Prompt；\n3. 每个变体请在开头用 <!-- variant:N --> 标记；\n4. 变体之间必须有明显差异（不要生成 5 个几乎一样的版本）。\n\n请直接输出 ${count} 个完整的 Prompt 模板变体。`;
@@ -122,7 +122,7 @@ async function generateVariants(promptTemplateName, diagnosis, count, model, cal
 
   const result = await runStreamChat([{ role: 'user', content: promptText }], await resolveRoleModelConfig('promptEvolve', model), {
     onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('evolve_variants', chunk); }
-  });
+  }, workId ? { workId, agentType: 'promptEvolve', promptTemplate: 'prompt-evolve-variants.md' } : undefined);
 
   if (callbacks?.onStepEnd) {
     callbacks.onStepEnd('evolve_variants', { chars: result.chars, durationMs: result.durationMs });
@@ -152,7 +152,7 @@ async function generateVariants(promptTemplateName, diagnosis, count, model, cal
   return variants.slice(0, count);
 }
 
-async function evaluateVariant(variantTemplate, evalDataset, model, callbacks) {
+async function evaluateVariant(variantTemplate, evalDataset, model, callbacks, workId) {
   if (evalDataset.length === 0) {
     return { avgFitness: 0, details: [], avgDimensions: {} };
   }
@@ -165,7 +165,7 @@ async function evaluateVariant(variantTemplate, evalDataset, model, callbacks) {
 
     const result = await runStreamChat([{ role: 'user', content: promptText }], await resolveRoleModelConfig('fitnessEvaluate', model), {
       onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('evolve_eval', chunk); }
-    });
+    }, workId ? { workId, agentType: 'fitnessEvaluate', promptTemplate: 'prompt-evolve-eval.md' } : undefined);
 
     let predicted = 0.5;
     let dimensions = {};
@@ -192,7 +192,7 @@ async function evaluateVariant(variantTemplate, evalDataset, model, callbacks) {
 /**
  * 轻量回溯评估：用变体 Prompt 对历史章节做 500 字开头重写，真实比较输出质量
  */
-async function evaluateVariantByBacktrace(variantTemplate, evalDataset, model, callbacks) {
+async function evaluateVariantByBacktrace(variantTemplate, evalDataset, model, callbacks, workId) {
   if (evalDataset.length === 0) return { avgFitness: 0, details: [] };
 
   // 只取最低分的 1 个样本做真实回溯（成本控制）
@@ -208,7 +208,8 @@ async function evaluateVariantByBacktrace(variantTemplate, evalDataset, model, c
   const result = await runStreamChat(
     [{ role: 'user', content: backtracePrompt }],
     await resolveRoleModelConfig('writer', model),
-    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('evolve_backtrace', chunk); } }
+    { onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('evolve_backtrace', chunk); } },
+    workId ? { workId, agentType: 'writer', promptTemplate: 'prompt-evolve-backtrace.md' } : undefined
   );
 
   if (callbacks?.onStepEnd) {
@@ -220,7 +221,9 @@ async function evaluateVariantByBacktrace(variantTemplate, evalDataset, model, c
 
   const evalResult = await runStreamChat(
     [{ role: 'user', content: evalPrompt }],
-    await resolveRoleModelConfig('fitnessEvaluate', model)
+    await resolveRoleModelConfig('fitnessEvaluate', model),
+    {},
+    workId ? { workId, agentType: 'fitnessEvaluate', promptTemplate: 'prompt-evolve-backtrace-eval.md' } : undefined
   );
 
   let predicted = 0.5;
@@ -270,9 +273,10 @@ async function evolvePrompt(templateName, workIds, options = {}) {
 
   await ensureEvolutionDir();
 
+  const workId = workIds[0];
   let evalDataset = [];
-  for (const workId of workIds) {
-    const ds = await gatherEvalDataset(workId, templateName);
+  for (const wid of workIds) {
+    const ds = await gatherEvalDataset(wid, templateName);
     evalDataset = evalDataset.concat(ds);
   }
 
@@ -289,16 +293,16 @@ async function evolvePrompt(templateName, workIds, options = {}) {
     };
   }
 
-  const diagnosis = await analyzeFailures(templateName, lowFitnessSamples, model, callbacks);
-  const variants = await generateVariants(templateName, diagnosis, variantCount, model, callbacks);
+  const diagnosis = await analyzeFailures(templateName, lowFitnessSamples, model, callbacks, workId);
+  const variants = await generateVariants(templateName, diagnosis, variantCount, model, callbacks, workId);
 
   const results = [];
   for (let i = 0; i < variants.length; i++) {
-    let evalResult = await evaluateVariant(variants[i], lowFitnessSamples, model, callbacks);
+    let evalResult = await evaluateVariant(variants[i], lowFitnessSamples, model, callbacks, workId);
 
     // 如果启用回溯评估，用最低分样本做一次真实重写
     if (useBacktrace && evalResult.avgFitness > 0.5) {
-      const backtrace = await evaluateVariantByBacktrace(variants[i], lowFitnessSamples.slice(0, 1), model, callbacks);
+      const backtrace = await evaluateVariantByBacktrace(variants[i], lowFitnessSamples.slice(0, 1), model, callbacks, workId);
       // 综合得分：预测 70% + 回溯 30%
       evalResult.avgFitness = parseFloat((evalResult.avgFitness * 0.7 + backtrace.avgFitness * 0.3).toFixed(4));
       evalResult.backtrace = backtrace;
@@ -314,10 +318,10 @@ async function evolvePrompt(templateName, workIds, options = {}) {
   }
 
   const baselineTemplate = await loadPromptRaw(templateName);
-  let baselineEval = await evaluateVariant(baselineTemplate, lowFitnessSamples, model, callbacks);
+  let baselineEval = await evaluateVariant(baselineTemplate, lowFitnessSamples, model, callbacks, workId);
 
   if (useBacktrace) {
-    const backtrace = await evaluateVariantByBacktrace(baselineTemplate, lowFitnessSamples.slice(0, 1), model, callbacks);
+    const backtrace = await evaluateVariantByBacktrace(baselineTemplate, lowFitnessSamples.slice(0, 1), model, callbacks, workId);
     baselineEval.avgFitness = parseFloat((baselineEval.avgFitness * 0.7 + backtrace.avgFitness * 0.3).toFixed(4));
     baselineEval.backtrace = backtrace;
   }

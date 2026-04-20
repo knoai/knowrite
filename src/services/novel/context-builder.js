@@ -28,7 +28,8 @@ async function compressChapterText(workId, chapterNumber, text, model, callbacks
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('summarizer', model),
-    callbacks || {}
+    callbacks || {},
+    { workId, agentType: 'compress', promptTemplate: 'compress-chapter.md' }
   );
   await writeFile(workId, cacheFile, result.content);
   return result.content;
@@ -57,7 +58,8 @@ async function compressDistantSummaries(workId, start, end, model, callbacks) {
   const result = await runStreamChat(
     [{ role: 'user', content: prompt }],
     await resolveRoleModelConfig('summarizer', model),
-    callbacks || {}
+    callbacks || {},
+    { workId, agentType: 'compress', promptTemplate: 'compress-distant.md' }
   );
   await writeFile(workId, cacheFile, result.content);
   return result.content;

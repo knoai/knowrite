@@ -19,6 +19,13 @@
     "deviationCheckText": 4000,
     "traceInputOutput": 500
   },
+  "tracing": {
+    "enabled": true,
+    "retainFullPrompt": false,
+    "retainFullOutput": false,
+    "previewLength": 500,
+    "maxRetentionDays": 30
+  },
   "inputGovernance": {
     "enabled": true,
     "planBeforeWrite": true,
@@ -43,6 +50,27 @@
     "defaultStrategy": "pipeline",
     "multivolumeTotalVolumes": 3,
     "importSplitRatio": 0.75
+  },
+  "pipeline": {
+    "mode": "auto",
+    "plan": {
+      "enabled": false,
+      "requireConfirmation": true
+    },
+    "stages": {
+      "writer": { "enabled": true, "skippable": false },
+      "editor": { "enabled": true, "skippable": false, "maxRounds": 3 },
+      "humanizer": { "enabled": true, "skippable": true },
+      "proofreader": { "enabled": true, "skippable": true, "skipIfFreeMode": true },
+      "reader": { "enabled": true, "skippable": true },
+      "summarizer": { "enabled": true, "skippable": false },
+      "polish": { "enabled": true, "skippable": true, "skipIfFreeMode": true },
+      "fitness": { "enabled": true, "skippable": false }
+    },
+    "autoSkip": {
+      "humanizer": { "ifLastFitness": "> 0.85", "consecutive": 2 },
+      "proofreader": { "ifFreeMode": true }
+    }
   },
   "fileNames": {
     "outlineTheme": "outline_theme.txt",
