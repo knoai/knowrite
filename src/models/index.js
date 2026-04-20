@@ -152,6 +152,7 @@ const Character = sequelize.define('Character', {
   goals: { type: DataTypes.TEXT, defaultValue: '' },
   background: { type: DataTypes.TEXT, defaultValue: '' },
   notes: { type: DataTypes.TEXT, defaultValue: '' },
+  voiceFingerprint: { type: DataTypes.JSON, allowNull: true },
 }, {
   tableName: 'characters',
   timestamps: true,
@@ -185,6 +186,32 @@ const CharacterRelation = sequelize.define('CharacterRelation', {
 });
 
 Work.hasMany(CharacterRelation, { foreignKey: 'workId', sourceKey: 'workId', as: 'characterRelations' });
+
+// 角色专属记忆（Episodic Memory）
+const CharacterMemory = sequelize.define('CharacterMemory', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  workId: { type: DataTypes.STRING, allowNull: false },
+  charName: { type: DataTypes.STRING, allowNull: false },
+  chapterNumber: { type: DataTypes.INTEGER, allowNull: false },
+  episodeType: { type: DataTypes.STRING, defaultValue: 'event' },
+  // event, dialogue, relationship_change, emotional_turn, goal_progress, knowledge_gain
+  content: { type: DataTypes.TEXT, allowNull: false },
+  importance: { type: DataTypes.INTEGER, defaultValue: 3 },
+  tags: { type: DataTypes.JSON, defaultValue: [] },
+  sourceText: { type: DataTypes.TEXT, allowNull: true },
+}, {
+  tableName: 'character_memories',
+  timestamps: true,
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt',
+  indexes: [
+    { fields: ['workId', 'charName'] },
+    { fields: ['workId', 'charName', 'chapterNumber'] },
+    { fields: ['workId'] },
+  ],
+});
+
+Work.hasMany(CharacterMemory, { foreignKey: 'workId', sourceKey: 'workId', as: 'characterMemories' });
 
 // 4. 剧情线
 const PlotLine = sequelize.define('PlotLine', {
@@ -647,4 +674,5 @@ module.exports = {
   CurrentFocus,
   ChapterIntent,
   Prompt,
+  CharacterMemory,
 };

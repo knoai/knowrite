@@ -13,6 +13,8 @@ const { resolveRoleModelConfig, getConfig } = require('../settings-store');
 const { buildAntiRepetitionReminder } = require('../memory-index');
 const { buildRagContext } = require('../rag-retriever');
 const { getWorldContextForPrompt } = require('../world-context');
+const { getVoiceFingerprintPrompt } = require('../voice-fingerprint');
+const { getCharacterMemoryPrompt } = require('../character-memory');
 
 /**
  * 压缩单章文本为摘要（带缓存）
@@ -160,11 +162,37 @@ async function buildSmartContext(workId, meta, nextNumber, models, callbacks) {
     console.error('[context-builder] RAG 检索失败:', err.message);
   }
 
+  // 声纹字典：防止长篇章节中角色说话风格漂移
+  let voiceContext = '';
+  try {
+    voiceContext = await getVoiceFingerprintPrompt(workId);
+  } catch (err) {
+    console.error('[context-builder] 声纹字典加载失败:', err.message);
+  }
+
+  // 角色专属记忆：Episodic Memory 注入
+  let charMemoryContext = '';
+  try {
+    charMemoryContext = await getCharacterMemoryPrompt(workId, [], nextNumber);
+  } catch (err) {
+    console.error('[context-builder] 角色记忆加载失败:', err.message);
+  }
+
+  const fullContext = [
+    timeWindow,
+    antiRepeat,
+    ragContext,
+    voiceContext,
+    charMemoryContext,
+  ].filter(Boolean).join('\n\n');
+
   return {
     timeWindow,
     antiRepeat,
     ragContext,
-    fullContext: timeWindow + antiRepeat + ragContext,
+    voiceContext,
+    charMemoryContext,
+    fullContext,
   };
 }
 
