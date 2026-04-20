@@ -638,9 +638,21 @@ Work.hasMany(CurrentFocus, { foreignKey: 'workId', sourceKey: 'workId', as: 'cur
 Work.hasMany(ChapterIntent, { foreignKey: 'workId', sourceKey: 'workId', as: 'chapterIntents' });
 
 let initialized = false;
+
+async function runMigrations() {
+  // SQLite 轻量迁移：检查并添加缺失列
+  const columns = await sequelize.query("PRAGMA table_info(characters)", { type: sequelize.QueryTypes.SELECT });
+  const columnNames = columns.map((c) => c.name);
+  if (!columnNames.includes('voiceFingerprint')) {
+    await sequelize.query("ALTER TABLE characters ADD COLUMN voiceFingerprint JSON");
+    console.log('[migration] 已添加 characters.voiceFingerprint 列');
+  }
+}
+
 async function initDb() {
   if (initialized) return;
-  await sequelize.sync({ alter: true });
+  await sequelize.sync();
+  await runMigrations();
   initialized = true;
 }
 
