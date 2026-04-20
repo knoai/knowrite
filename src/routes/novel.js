@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { startNovel, continueNovel, tryCreateOutline, tryCreateDetailedOutline, tryCreateChapters, tryContinue, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, listWorks, getWorkDir, loadMeta } = require('../services/novel-engine');
+const { startNovel, continueNovel, tryCreateOutline, tryCreateDetailedOutline, tryCreateChapters, tryContinue, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, listWorks, deleteWork, getWorkDir, loadMeta } = require('../services/novel-engine');
 const { expandStyle } = require('../services/novel/novel-utils');
 const { loadPrompt } = require('../services/prompt-loader');
 const { checkContentRepetition, repairContentRepetition } = require('../services/memory-index');
@@ -405,6 +405,15 @@ router.get('/works/:workId', async (req, res) => {
     fitnessRecords,
     repetitionRecords,
   });
+});
+
+router.delete('/works/:workId', async (req, res) => {
+  try {
+    await deleteWork(req.params.workId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Import & Correction APIs

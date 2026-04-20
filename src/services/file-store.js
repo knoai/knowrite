@@ -155,6 +155,12 @@ async function fileExists(workId, filename) {
   return count > 0;
 }
 
+async function deleteAllWorkFiles(workId) {
+  await initDb();
+  await WorkFile.destroy({ where: { workId } });
+  invalidateWorkCache(workId);
+}
+
 module.exports = {
   writeFile,
   readFile,
@@ -164,6 +170,7 @@ module.exports = {
   deleteFile,
   listFiles,
   fileExists,
+  deleteAllWorkFiles,
   invalidateCache,
   invalidateWorkCache,
 };

@@ -219,6 +219,42 @@ async function listWorks() {
   return works.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 }
 
+async function deleteWork(workId) {
+  await initDb();
+  const meta = await loadMeta(workId);
+  if (!meta) {
+    // 如果 DB 中没有，尝试只清理本地目录
+    const workDir = getWorkDir(workId);
+    try {
+      await fs.promises.rm(workDir, { recursive: true, force: true });
+    } catch (err) {
+      console.error(`[novel-engine] 删除作品目录失败: ${workId}`, err.message);
+    }
+    return { success: true };
+  }
+
+  // 1. 删除 DB 中的关联数据（Sequelize 外键级联）
+  await Work.destroy({ where: { workId } });
+
+  // 2. 删除 fileStore 中的所有作品文件
+  try {
+    await fileStore.deleteAllWorkFiles(workId);
+  } catch (err) {
+    console.error(`[novel-engine] 删除作品文件存储失败: ${workId}`, err.message);
+  }
+
+  // 3. 删除本地作品目录
+  const workDir = getWorkDir(workId);
+  try {
+    await fs.promises.rm(workDir, { recursive: true, force: true });
+  } catch (err) {
+    console.error(`[novel-engine] 删除作品目录失败: ${workId}`, err.message);
+  }
+
+  console.log(`[novel-engine] 作品已删除: ${workId}`);
+  return { success: true };
+}
+
 // ============ 上下文构建 ============
 
 
@@ -686,6 +722,7 @@ module.exports = {
   readFile,
   appendToFullTxt,
   listWorks,
+  deleteWork,
   startNovel,
   continueNovel,
   tryCreateOutline,
