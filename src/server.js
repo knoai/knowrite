@@ -17,6 +17,7 @@ const inputGovernanceRouter = require('./routes/input-governance');
 const bookDeconstructRouter = require('./routes/book-deconstructor');
 const characterMemoryRouter = require('./routes/character-memory');
 const voiceFingerprintRouter = require('./routes/voice-fingerprint');
+const chatAgentRouter = require('./routes/chat-agent');
 const mcpServer = require('./mcp/server');
 const { getSettings, getConfig } = require('./services/settings-store');
 const { requireAuth } = require('./middleware/auth');
@@ -175,6 +176,7 @@ const app = express();
   app.use('/api/book-deconstruct', bookDeconstructRouter);
   app.use('/api/novel/works/:workId/character-memories', characterMemoryRouter);
   app.use('/api/novel/works/:workId/voice-fingerprints', voiceFingerprintRouter);
+  app.use('/api/chat-agent', chatAgentRouter);
 
   // MCP SSE endpoint
   app.get('/mcp/sse', async (req, res) => {
