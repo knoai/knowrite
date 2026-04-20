@@ -640,7 +640,7 @@ Work.hasMany(ChapterIntent, { foreignKey: 'workId', sourceKey: 'workId', as: 'ch
 let initialized = false;
 async function initDb() {
   if (initialized) return;
-  await sequelize.sync();
+  await sequelize.sync({ alter: true });
   initialized = true;
 }
 
