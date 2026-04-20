@@ -129,6 +129,11 @@ function ensurePresetFields(data) {
       }
     };
     mergeModelCfg(d.modelConfig, defaultModelConfig);
+    // 如果用户保存的 providers 为空，从种子数据恢复默认 Provider 模板
+    const seedProviders = seedSettings.modelConfig?.providers;
+    if (seedProviders && Object.keys(d.modelConfig.providers || {}).length === 0) {
+      d.modelConfig.providers = JSON.parse(JSON.stringify(seedProviders));
+    }
   }
   // 确保 writerRotation 存在
   if (!d.modelConfig.writerRotation) {
