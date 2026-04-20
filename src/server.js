@@ -54,7 +54,7 @@ const app = express();
     netCfg = {
       server: { port: 8000, jsonBodyLimit: '10mb', logDir: '../logs', accessLogFile: 'access.log', apiLogFile: 'api.log', staticDir: '../../knowrite-ui/dist', spaFallback: '../../knowrite-ui/dist/index.html' },
       cors: { methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'] },
-      rateLimit: { windowMs: 60000, max: 60, skipPaths: ['/health'] },
+      rateLimit: { windowMs: 60000, max: 120, skipPaths: ['/health', '/api/logs/stream'] },
     };
   }
 
