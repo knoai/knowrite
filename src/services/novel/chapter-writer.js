@@ -243,13 +243,15 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   await checkPaused(workId, `editor_${nextNumber}`);
 
   // 2. 编辑-作者改循环，直到编辑通过或达到最大轮次
+  let lastEditedResult;
   if (stages.editor?.enabled === false) {
     console.log(`[pipeline] 第${nextNumber}章 Editor 已禁用，跳过审阅`);
+    lastEditedResult = rawResult;
     await writeFile(workId, `chapter_${nextNumber}_edit.txt`, rawResult.content);
   } else {
   let currentDraft = rawResult.content;
   let lastEditResult = null;
-  let lastEditedResult = null;
+  lastEditedResult = null;
   let passedRound = 0;
   const prevFinal =
     nextNumber > 1 ? await readFile(workId, `chapter_${nextNumber - 1}_final.txt`) : '';
