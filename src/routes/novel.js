@@ -1,7 +1,8 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { startNovel, continueNovel, tryCreateOutline, tryCreateDetailedOutline, tryCreateChapters, tryContinue, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, listWorks, deleteWork, getWorkDir, loadMeta } = require('../services/novel-engine');
+const { PausedError } = require('../services/pause-utils');
+const { startNovel, continueNovel, tryCreateOutline, tryCreateDetailedOutline, tryCreateChapters, tryContinue, importNovel, importOutline, detectOutlineDeviation, correctOutlineDeviation, correctStyle, listWorks, deleteWork, getWorkDir, loadMeta } = require("../services/novel-engine");
 const { expandStyle } = require('../services/novel/novel-utils');
 const { loadPrompt } = require('../services/prompt-loader');
 const { checkContentRepetition, repairContentRepetition } = require('../services/memory-index');
@@ -93,7 +94,12 @@ router.post('/start', validateBody(startSchema), async (req, res) => {
       },
     }, platformStyle, authorStyle, writingMode, storyTemplate, language);
   } catch (err) {
-    sendError(stream, err, '/start');
+    if (err && err.name === 'PausedError') {
+      stream.send({ type: 'paused', step: err.step, message: err.message });
+      stream.end();
+    } else {
+      sendError(stream, err, '/start');
+    }
   }
 });
 
@@ -121,7 +127,12 @@ router.post('/continue', validateBody(continueSchema), async (req, res) => {
       },
     }, { targetVolume });
   } catch (err) {
-    sendError(stream, err, '/continue');
+    if (err && err.name === 'PausedError') {
+      stream.send({ type: 'paused', step: err.step, message: err.message });
+      stream.end();
+    } else {
+      sendError(stream, err, '/continue');
+    }
   }
 });
 
@@ -1012,6 +1023,49 @@ router.post('/works/:workId/extract-world', async (req, res) => {
     res.json({ success: true, stats: result.stats });
   } catch (err) {
     console.error('[novel] extract-world error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Pause / Resume / Status
+router.post('/pause', async (req, res) => {
+  try {
+    const { workId } = req.body || {};
+    if (!workId) return res.status(400).json({ error: 'Missing workId' });
+    await initDb();
+    const work = await Work.findByPk(workId);
+    if (!work) return res.status(404).json({ error: 'Work not found' });
+    work.status = 'paused';
+    await work.save();
+    res.json({ success: true, status: 'paused' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/resume', async (req, res) => {
+  try {
+    const { workId } = req.body || {};
+    if (!workId) return res.status(400).json({ error: 'Missing workId' });
+    await initDb();
+    const work = await Work.findByPk(workId);
+    if (!work) return res.status(404).json({ error: 'Work not found' });
+    work.status = 'running';
+    await work.save();
+    res.json({ success: true, status: 'running' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/status/:workId', async (req, res) => {
+  try {
+    const { workId } = req.params;
+    await initDb();
+    const work = await Work.findByPk(workId, { attributes: ['status', 'pausedAtStep'] });
+    if (!work) return res.status(404).json({ error: 'Work not found' });
+    res.json({ status: work.status, pausedAtStep: work.pausedAtStep });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

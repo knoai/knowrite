@@ -12,6 +12,7 @@ const fileStore = require('../file-store');
 const { getWorkDir } = require('../../core/paths');
 const { runStreamChat } = require('../../core/chat');
 const { loadPrompt } = require('../prompt-loader');
+const { PausedError, checkPaused } = require('../pause-utils');
 const { getWorldContextForPrompt } = require('../world-context');
 const {
   buildReviewDimensionsText,
@@ -239,6 +240,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   );
   await writeFile(workId, `chapter_${nextNumber}_raw.txt`, rawResult.content);
   if (callbacks.onStepEnd) callbacks.onStepEnd(`raw_${nextNumber}`, rawResult);
+  await checkPaused(workId, `editor_${nextNumber}`);
 
   // 2. 编辑-作者改循环，直到编辑通过或达到最大轮次
   if (stages.editor?.enabled === false) {
@@ -340,6 +342,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     lastEditResult = editResult;
     await writeFile(workId, `chapter_${nextNumber}_edit.txt`, editResult.content);
     if (callbacks.onStepEnd) callbacks.onStepEnd(editKey, editResult);
+    await checkPaused(workId, `editor_revision_${nextNumber}`);
 
     // 双重判定：关键词 + 维度通过率
     const verdict = await editReviewer.parseEditorVerdict(editResult.content);
@@ -391,6 +394,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
       currentDraft = editedResult.content;
       await writeFile(workId, `chapter_${nextNumber}_edited.txt`, editedResult.content);
       if (callbacks.onStepEnd) callbacks.onStepEnd(editedKey, editedResult);
+    await checkPaused(workId, `editor_final_${nextNumber}`);
     } else {
       // 最后一轮仍未通过，强制以最后一稿进入后续流程
       if (!lastEditedResult) {
@@ -441,6 +445,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     );
     await writeFile(workId, `chapter_${nextNumber}_humanized.txt`, humanizedResult.content);
     if (callbacks.onStepEnd) callbacks.onStepEnd(`humanized_${nextNumber}`, humanizedResult);
+  await checkPaused(workId, `final_${nextNumber}`);
   }
 
   // 5. 校编：校对（自由风跳过，或 pipeline 配置禁用，或 autoSkip）
@@ -474,6 +479,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     await writeFile(workId, `chapter_${nextNumber}_final.txt`, finalResult.content);
     await appendToFullTxt(workId, `第${nextNumber}章`, finalResult.content);
     if (callbacks.onStepEnd) callbacks.onStepEnd(`final_${nextNumber}`, finalResult);
+  await checkPaused(workId, `feedback_${nextNumber}`);
   }
 
   // 6. 读者：反馈
@@ -499,6 +505,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     feedbackJson = feedbackJson.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim();
     await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackJson);
     if (callbacks.onStepEnd) callbacks.onStepEnd(`feedback_${nextNumber}`, feedbackResult);
+  await checkPaused(workId, `summary_${nextNumber}`);
   }
 
   // 7. 摘要
@@ -522,6 +529,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
   }
   await writeFile(workId, `chapter_${nextNumber}_summary.txt`, summaryResult.content);
   if (callbacks.onStepEnd) callbacks.onStepEnd(`summary_${nextNumber}`, summaryResult);
+  await checkPaused(workId, `fitness_${nextNumber}`);
 
   // 更新智能检索索引
   try {
@@ -789,6 +797,7 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
     feedbackJson = feedbackJson.replace(/```json\s*/i, '').replace(/```\s*$/m, '').trim();
     await writeFile(workId, `chapter_${nextNumber}_feedback.json`, feedbackJson);
     if (callbacks.onStepEnd) callbacks.onStepEnd(`feedback_${nextNumber}`, feedbackResult);
+  await checkPaused(workId, `summary_${nextNumber}`);
   }
 
   // 摘要
@@ -811,6 +820,7 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
     }, workId);
     await writeFile(workId, `chapter_${nextNumber}_summary.txt`, summaryResult.content);
     if (callbacks.onStepEnd) callbacks.onStepEnd(`summary_${nextNumber}`, summaryResult);
+  await checkPaused(workId, `fitness_${nextNumber}`);
   }
 
   // 更新索引

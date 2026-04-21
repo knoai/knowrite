@@ -16,6 +16,7 @@ const novelUtils = require('./novel/novel-utils');
 const chapterWriter = require('./novel/chapter-writer');
 const chapterProcessor = require('./novel/chapter-processor');
 const { extractWorldFromOutlines } = require('./world-extractor');
+const { PausedError, checkPaused } = require('./pause-utils');
 const { detectOutlineDeviation } = require('./outline-deviation');
 
 async function generateWorkId(topic, strategy) {
@@ -25,6 +26,8 @@ async function generateWorkId(topic, strategy) {
   const sanitized = sanitizeWorkId(raw);
   return sanitized || raw.replace(/[^a-zA-Z0-9_\-]/g, '_');
 }
+
+
 
 async function loadMeta(workId) {
   await initDb();
@@ -371,6 +374,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
   }, workId, language);
   await writeFile(workId, 'outline_theme.txt', outlineThemeResult.content);
   if (callbacks.onStepEnd) callbacks.onStepEnd('outline_theme', outlineThemeResult);
+  await checkPaused(workId, 'outline_detailed');
 
   // 2. 生成详细纲章
   if (callbacks.onStepStart) callbacks.onStepStart({ key: 'outline_detailed', name: '生成详细纲章', model: outlineModel });
@@ -392,6 +396,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
     outlineMultivolume = mvResult.content;
     await writeFile(workId, 'outline_multivolume.txt', outlineMultivolume);
     if (callbacks.onStepEnd) callbacks.onStepEnd('outline_multivolume', mvResult);
+    await checkPaused(workId, 'volume_outlines');
 
     // 生成各卷纲章
     const totalVolumes = engineCfg.generation.multivolumeTotalVolumes;
@@ -403,6 +408,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
       }, workId, language);
       await writeFile(workId, `volume_${v}_outline.txt`, volResult.content);
       if (callbacks.onStepEnd) callbacks.onStepEnd(stepKey, volResult);
+      await checkPaused(workId, `volume_outline_done`);
       volumes.push({
         workId,
         number: v,
@@ -434,6 +440,8 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
     console.error(`[novel-engine] 世界观提取失败: ${err.message}`);
     // 提取失败不应阻塞主流程
   }
+
+  await checkPaused(workId, 'chapter_1');
 
   // 6. 写第一章
   const chapterResult = strategy === 'knowrite'
@@ -770,6 +778,8 @@ async function correctStyle(workId, chapterNumber, newStyle, model, callbacks) {
 }
 
 module.exports = {
+  PausedError,
+  checkPaused,
   generateWorkId,
   loadMeta,
   saveMeta,

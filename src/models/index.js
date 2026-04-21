@@ -28,6 +28,8 @@ const Work = sequelize.define('Work', {
   fitness: { type: DataTypes.JSON, defaultValue: {} },
   writingMode: { type: DataTypes.STRING, defaultValue: null },
   language: { type: DataTypes.STRING, defaultValue: 'zh' },
+  status: { type: DataTypes.STRING, defaultValue: 'idle' },
+  pausedAtStep: { type: DataTypes.STRING, defaultValue: '' },
 }, {
   tableName: 'works',
   timestamps: true,
