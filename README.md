@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Knowrite-小说创作引擎-6366f1?style=for-the-badge&logo=book&logoColor=white" alt="Knowrite">
+  <img src="https://img.shields.io/badge/Knowrite-Novel%20Writing%20Engine-6366f1?style=for-the-badge&logo=book&logoColor=white" alt="Knowrite">
 </p>
 
-<h1 align="center">Knowrite 小说创作引擎<br><sub>Engineered Novel Writing Backend</sub></h1>
+<h1 align="center">Knowrite Novel Writing Engine<br><sub>Engineered Novel Writing Backend</sub></h1>
 
 <p align="center">
   <a href="#"><img src="https://img.shields.io/badge/Node.js-24+-339933?logo=nodedotjs&logoColor=white" alt="Node.js"></a>
@@ -14,404 +14,409 @@
 </p>
 
 <p align="center">
-  <a href="README.md">中文</a> | <a href="README.en.md">English</a>
+  <a href="README.md">English</a> | <a href="README.zh.md">简体中文</a>
 </p>
 
 ---
 
-AI Agent 自主写小说——写、审、改、评，全程接管。基于多 Agent 协作的工程化创作流水线，覆盖工业风严格评审与自由风快速创作双模式，内置 RAG 向量记忆、Fitness 五维质量评估、Prompt 自动进化、拆书分析与 Skill 萃取。
+AI Agents autonomously write novels — draft, review, revise, and evaluate, fully automated. A multi-agent collaborative engineering pipeline covering strict industrial-grade review and free creative modes, with built-in RAG vector memory, five-dimensional Fitness quality assessment, automatic Prompt evolution, book deconstruction, and Skill extraction.
 
-**Knowrite 是一个 Node.js / Express 后端服务**，提供从大纲生成、章节撰写、编辑评审、去 AI 化、读者反馈到质量评估的完整自动化小说创作 API。**所有模型调用统一通过 OpenAI 兼容协议**，用户自行配置 Provider、Base URL 和 API Key，无内置默认模型，零外部向量库依赖，单节点即可运行。
+**Knowrite is a Node.js / Express backend service** providing a complete automated novel creation API from outline generation, chapter writing, editorial review, de-AIization, reader feedback to quality assessment. **All model calls use a unified OpenAI-compatible protocol** — users configure their own Provider, Base URL, and API Key. No built-in default models, zero external vector database dependencies, runs on a single node.
 
-配套前端 [`knowrite-ui`](https://github.com/knoai/knowrite-ui)（React 19 + Vite + Tailwind CSS，MIT 协议）提供作品管理、实时创作流可视化、Fitness 看板、世界观编辑、Prompt 管理、Plan 预演、Trace 调试台和实时日志面板。
+Companion frontend [`knowrite-ui`](https://github.com/knoai/knowrite-ui) (React 19 + Vite + Tailwind CSS, MIT license) provides work management, real-time creation flow visualization, Fitness dashboard, world-building editor, Prompt management, Plan preview, Trace debugger, and real-time log panel.
 
-> **📁 作品存储**：采用 SQLite 主存储 + 本地文件双写机制。所有章节文本、大纲、评审记录存入 `data/novel.db`，同时自动备份到 `works/<workId>/` 目录下的 `.txt` / `.json` 文件，方便直接取用。
+> **📁 Work Storage**: SQLite primary storage + local file dual-write mechanism. All chapter text, outlines, and review records are stored in `data/novel.db`, while automatically backed up to `works/<workId>/` directory as `.txt` / `.json` files for easy access.
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 环境要求
+### Requirements
 
 - Node.js 24+
-- 任意 OpenAI-compatible API Key（需自行配置 Provider）
+- Any OpenAI-compatible API Key (user-configured Provider)
 
-### 安装
+### Installation
 
 ```bash
-# 克隆后端仓库
+# Clone backend repo
 git clone https://github.com/knoai/knowrite.git
 cd knowrite
 
-# 安装依赖
+# Install dependencies
 npm install
 
-# 配置环境变量（复制模板后按需修改）
+# Configure environment variables (copy template and edit as needed)
 cp .env.example .env
 
-# 启动服务
+# Start service
 npm start
-# 服务运行在 http://localhost:8000
+# Service runs at http://localhost:8000
 
-# ⚠️ 首次使用必须先配置模型：
-# 打开前端「设置 → 模型配置」，添加 Provider（如千问/百炼/DeepSeek），
-# 填写 Base URL、API Key 和模型列表，并为各角色分配模型。
+# ⚠️ First-time setup: You MUST configure models first:
+# Open frontend "Settings → Model Config", add a Provider (e.g. Qwen/Bailian/DeepSeek),
+# fill in Base URL, API Key, and model list, then assign models to each role.
 ```
 
-### 前端联调
+### Frontend Dev
 
 ```bash
-# 另起终端，启动配套前端
+# In another terminal, start the companion frontend
 cd ../knowrite-ui
 npm install
 npm run dev
-# 前端运行在 http://localhost:5173，自动代理到后端
+# Frontend runs at http://localhost:5173, auto-proxies to backend
 ```
 
-### 写第一本小说
+### Write Your First Novel
 
 ```bash
-# 创建作品
+# Create a work
 curl -X POST http://localhost:8000/api/novel/start \
   -H "Content-Type: application/json" \
-  -d '{"topic":"修仙小说","platformStyle":"番茄","authorStyle":"热血","strategy":"knowrite"}'
+  -d '{"topic":"Cultivation Novel","platformStyle":"Fanqie","authorStyle":"Hot-blooded","strategy":"knowrite"}'
 
-# 续写下一章（SSE 流式输出）
+# Continue next chapter (SSE streaming)
 curl -X POST http://localhost:8000/api/novel/continue \
   -H "Content-Type: application/json" \
-  -d '{"workId":"<返回的workId>"}'
+  -d '{"workId":"<returned workId>"}'
 
-# 查看作品详情（含 Fitness 评分、评审记录）
+# View work details (with Fitness scores, review records)
 curl http://localhost:8000/api/novel/works/<workId>
 ```
 
 ---
 
-## 核心特性
+## Core Features
 
-### 多 Agent 写作流水线
+### Multi-Agent Writing Pipeline
 
-每一章由多个 Agent 接力完成，全程零人工干预：
+Each chapter is completed by multiple Agents in relay, zero manual intervention:
 
-| Agent | 职责 |
-|-------|------|
-| **Writer** | 依据大纲 + 智能上下文生成初稿（字数治理 + 反重复提醒 + RAG 检索注入） |
-| **Editor** | 结构化评审（`[是]`/`[否]` 双重通过标准），最多 3 轮改稿循环 |
-| **Humanizer** | 去 AI 化处理，消除 LLM 高频词、句式单调和过度总结痕迹 |
-| **Proofreader** | 校编润色（工业风模式）或跳过（自由风模式） |
-| **Reader** | 模拟读者视角，输出结构化反馈（沉浸感 / 节奏 / 角色认同） |
-| **Summarizer** | 生成章节摘要，自动索引到 RAG 向量库 |
-| **Fitness** | 五维量化评分（字数 / 重复 / 评审 / 读者 / 连贯），自动落盘 |
+| Agent | Responsibility |
+|-------|---------------|
+| **Writer** | Generates draft based on outline + smart context (word count governance + anti-repetition reminders + RAG retrieval injection) |
+| **Editor** | Structured review (`[YES]`/`[NO]` dual-pass standard), up to 3 revision rounds |
+| **Humanizer** | De-AI processing to eliminate LLM frequent words, monotonous sentence patterns, and excessive summarization traces |
+| **Proofreader** | Proofreading and polishing (industrial mode) or skipped (free mode) |
+| **Reader** | Simulates reader perspective, outputs structured feedback (immersion / pacing / character identification) |
+| **Summarizer** | Generates chapter summary, auto-indexed to RAG vector database |
+| **Fitness** | Five-dimensional quantitative scoring (word count / repetition / review / reader / coherence), auto-saved |
 
-如果 Editor 评审不通过，管线自动进入"改稿 → 再评审"循环，直到通过或达到最大轮次。
+If Editor review fails, the pipeline automatically enters a "revise → re-review" loop until passed or max rounds reached.
 
-### Editor 双重通过标准
+### Editor Dual-Pass Standard
 
-Editor 评审不只看"感觉"，而是结构化判定：
+Editor review is not just about "feeling" — it's a structured judgment:
 
-- **关键词通过**：必须显式输出 `[是]` 才视为通过，`[否]` 直接进入下一轮改稿
-- **维度通过率**：8~33 个评审维度中，通过维度占比必须 ≥ 80%
-- **历史反馈注入**：第 2 轮起，Editor 自动看到之前各轮的评审意见和修改痕迹，避免反复犯同一类错误
-- **评审记录落盘**：每轮评审结果自动保存为 `review_chapter_{n}/round_{i}.json`，供 Fitness 评估和人类审阅
+- **Keyword pass**: Must explicitly output `[YES]` to pass; `[NO]` immediately enters next revision round
+- **Dimension pass rate**: Among 8~33 review dimensions, pass rate must be ≥ 80%
+- **Historical feedback injection**: From round 2 onwards, Editor automatically sees previous rounds' review comments and revision traces, avoiding repeated mistakes
+- **Review record persistence**: Each round's review results are auto-saved as `review_chapter_{n}/round_{i}.json` for Fitness assessment and human review
 
-### Fitness 五维质量评估
+### Fitness Five-Dimensional Quality Assessment
 
-每章完成后自动评分，无需人工介入：
+Automatically scored after each chapter completion, no manual intervention needed:
 
-| 维度 | 评估内容 | 权重 |
-|------|----------|------|
-| **字数** | 与目标字数偏差（高斯分布评分） | 20% |
-| **重复** | 与历史章节的内容重复检测 | 20% |
-| **评审** | Editor 评审通过率 | 20% |
-| **读者** | 模拟读者反馈评分 | 20% |
-| **连贯** | 大纲偏离检测（low/medium/high 严重度映射） | 20% |
+| Dimension | Evaluation Content | Weight |
+|-----------|-------------------|--------|
+| **Word Count** | Deviation from target word count (Gaussian distribution scoring) | 20% |
+| **Repetition** | Content repetition detection with historical chapters | 20% |
+| **Review** | Editor review pass rate | 20% |
+| **Reader** | Simulated reader feedback score | 20% |
+| **Coherence** | Outline deviation detection (low/medium/high severity mapping) | 20% |
 
-Fitness 分数实时写入 `fitness.json`，前端 Fitness 看板可直接展示趋势图。
+Fitness scores are written to `fitness.json` in real-time; the frontend Fitness dashboard can directly display trend charts.
 
-### RAG 向量记忆检索
+### RAG Vector Memory Retrieval
 
-零外部向量库依赖，纯 JS 实现：
+Zero external vector database dependency, pure JS implementation:
 
-- **Embedding 生成**：调用 Provider 的 `/v1/embeddings` 接口（复用同一 API Key）
-- **向量存储**：SQLite JSON 列存储 embedding，自动建立索引
-- **相似度计算**：纯 JS 余弦相似度，章节摘要检索阈值 0.65，角色/设定检索阈值 0.7
-- **自动索引**：每章 Summarizer 完成后，摘要自动编码入库
-- **上下文注入**：Writer 写作前自动检索 Top-3 相关历史章节摘要，注入 prompt
+- **Embedding generation**: Calls Provider's `/v1/embeddings` endpoint (reuses same API Key)
+- **Vector storage**: SQLite JSON column stores embeddings, auto-indexed
+- **Similarity calculation**: Pure JS cosine similarity, chapter summary retrieval threshold 0.65, character/setting retrieval threshold 0.7
+- **Auto-indexing**: After each chapter's Summarizer completes, summary is automatically encoded and stored
+- **Context injection**: Before Writer writes, automatically retrieves Top-3 relevant historical chapter summaries and injects into prompt
 
-### 三层记忆系统
+### Three-Layer Memory System
 
-统一记忆架构，将分散的记忆模块整合为三层模型：
+Unified memory architecture integrating dispersed memory modules into a three-layer model:
 
-| 层级 | 名称 | 内容 | 对应模块 |
-|------|------|------|----------|
-| **L1** | Working Memory | 当前章节正在使用的上下文窗口 | `context-builder.js` |
-| **L2** | Episodic Memory | 角色经历、事件流、时间线 | `character-memory.js` + `temporal-truth.js` |
-| **L3** | Semantic Memory | 世界观、规则、人物设定、声纹字典 | `world-context.js` + `voice-fingerprint.js` |
+| Layer | Name | Content | Module |
+|-------|------|---------|--------|
+| **L1** | Working Memory | Current chapter's active context window | `context-builder.js` |
+| **L2** | Episodic Memory | Character experiences, event flows, timelines | `character-memory.js` + `temporal-truth.js` |
+| **L3** | Semantic Memory | Worldview, rules, character settings, voice dictionary | `world-context.js` + `voice-fingerprint.js` |
 
-### 角色专属记忆（Episodic Memory）
+### Character Episodic Memory
 
-为每个角色维护独立的经历档案：
+Maintains independent experience archives for each character:
 
-- **经历提取**：从章节摘要自动提取角色的重大事件、对话、关系变化、情感转折
-- **经历类型**：event / dialogue / relationship_change / emotional_turn / goal_progress / knowledge_gain
-- **记忆注入**：Writer 写作前自动检索相关角色的近期经历，注入 prompt
-- **持久化**：角色记忆同时存入 SQLite 和 `works/<workId>/characters/<name>.json`
+- **Experience extraction**: Automatically extracts character's major events, dialogues, relationship changes, and emotional turns from chapter summaries
+- **Experience types**: event / dialogue / relationship_change / emotional_turn / goal_progress / knowledge_gain
+- **Memory injection**: Before Writer writes, automatically retrieves relevant character's recent experiences and injects into prompt
+- **Persistence**: Character memories are stored in both SQLite and `works/<workId>/characters/<name>.json`
 
-### 人设声纹字典（Voice Fingerprint）
+### Voice Fingerprint Dictionary
 
-从章节文本提取角色对话的"声纹"，确保角色说话风格一致：
+Extracts character dialogue "voice prints" from chapter text to ensure consistent speaking style:
 
-- **统计维度**：平均句长、句式模板、高频词/口头禅（TF-IDF）、语气标记、修辞偏好、人称比例
-- **自动提取**：每章完成后自动解析对话，更新对应角色的声纹数据
-- **写作注入**：Writer 收到目标角色的声纹约束，保持对话风格一致性
+- **Statistical dimensions**: Average sentence length, sentence templates, frequent words/catchphrases (TF-IDF), tone markers, rhetorical preferences, person ratios
+- **Auto-extraction**: After each chapter completes, automatically parses dialogues and updates corresponding character's voice data
+- **Writing injection**: Writer receives target character's voice constraints to maintain dialogue style consistency
 
-### 拆书分析（Book Deconstructor）
+### Book Deconstruction
 
-上传任意小说文本，AI 自动拆解为结构化创作素材：
+Upload any novel text, AI automatically deconstructs it into structured creative material:
 
-- **结构分析**：套路模板、章节结构、节拍密度
-- **人物分析**：角色设定、关系网络、成长弧线
-- **世界观分析**：势力分布、力量体系、设定规则
-- **风格分析**：复用 AuthorFingerprint 模块提取语言风格
-- **一键创建**：拆解结果可直接生成 `StoryTemplate` + `AuthorFingerprint` + Prompt
+- **Structure analysis**: Template patterns, chapter structure, beat density
+- **Character analysis**: Character settings, relationship networks, growth arcs
+- **Worldview analysis**: Force distribution, power systems, setting rules
+- **Style analysis**: Reuses AuthorFingerprint module to extract language style
+- **One-click creation**: Deconstruction results can directly generate `StoryTemplate` + `AuthorFingerprint` + Prompt
 
-### Skill 自动萃取
+### Skill Auto-Extraction
 
-从高分章节自动提炼可复用的创作技能：
+Automatically distills reusable creative skills from high-scoring chapters:
 
-- **触发条件**：连续 N 章 Fitness ≥ 阈值时自动触发萃取
-- **Skill 格式**：Markdown 元数据（name / tags / fitnessThreshold / extractedFrom）+ 创作要点正文
-- **自动注入**：后续作品创作时，匹配当前题材标签的 Skill 自动注入 Writer prompt
-- **持久化**：萃取的 Skill 保存到 `skills/generated/` 目录
+- **Trigger condition**: Automatically triggers extraction when N consecutive chapters have Fitness ≥ threshold
+- **Skill format**: Markdown metadata (name / tags / fitnessThreshold / extractedFrom) + creative key points body
+- **Auto-injection**: During subsequent work creation, Skills matching current genre tags are automatically injected into Writer prompt
+- **Persistence**: Extracted Skills are saved to `skills/generated/` directory
 
-### 对话式创作代理（Chat Agent）
+### Chat Agent
 
-通过自然语言对话与作品互动：
+Interact with works through natural language dialogue:
 
-- **续写/修改**："把第三章的战斗场面写得更激烈一些"
-- **查询信息**："主角目前修炼到什么境界了？"
-- **创作建议**："接下来怎么安排一个反转？"
-- **上下文感知**：Agent 自动加载作品完整上下文（meta、大纲、章节、设定、人物）后作答
+- **Continue/Revise**: "Make the battle scene in Chapter 3 more intense"
+- **Query info**: "What cultivation realm has the protagonist reached?"
+- **Creative advice**: "How should I arrange a plot twist next?"
+- **Context awareness**: Agent automatically loads the work's complete context (meta, outline, chapters, settings, characters) before responding
 
-### MCP 服务器
+### MCP Server
 
-内置轻量级 [Model Context Protocol](https://modelcontextprotocol.io/) 服务器（JSON-RPC 2.0 + SSE）：
+Built-in lightweight [Model Context Protocol](https://modelcontextprotocol.io/) server (JSON-RPC 2.0 + SSE):
 
-- **`search_hot_novels`** — 搜索热门小说库，获取题材参考
-- **`extract_novel_features`** — 提取小说特征并保存为模板
-- 支持 Cursor / Claude Code 等 MCP 客户端直接连接
+- **`search_hot_novels`** — Search popular novel database for genre references
+- **`extract_novel_features`** — Extract novel features and save as templates
+- Supports direct connection from Cursor / Claude Code and other MCP clients
 
-### 大纲偏离检测
+### Outline Deviation Detection
 
-AI 自动判定章节内容是否偏离既定大纲：
+AI automatically determines if chapter content deviates from the established outline:
 
-- **low**：轻微偏离，Fitness 连贯分 = 1.0
-- **medium**：中度偏离，Fitness 连贯分 = 0.6，触发警告
-- **high**：严重偏离，Fitness 连贯分 = 0.3，可触发自动矫正重写
+- **low**: Slight deviation, Fitness coherence score = 1.0
+- **medium**: Moderate deviation, Fitness coherence score = 0.6, triggers warning
+- **high**: Severe deviation, Fitness coherence score = 0.3, can trigger automatic correction rewrite
 
-### Prompt 自动进化
+### Prompt Auto-Evolution
 
-基于 Fitness 低分样本自动优化 Prompt：
+Automatically optimizes Prompts based on Fitness low-score samples:
 
-1. **收集缺陷**：提取 Fitness 评分 < 0.6 的章节和对应 Editor 评审意见
-2. **分析根因**：定位是 Prompt 表述不清、约束不足还是示例缺失
-3. **生成变体**：基于缺陷分析生成 3~5 个 Prompt 变体
-4. **评估择优**：用历史章节做回测，选择 Fitness 提升最大的变体
-5. **渐进替换**：新变体仅在后续新章节生效，不影响历史作品
+1. **Collect defects**: Extract chapters with Fitness score < 0.6 and corresponding Editor review comments
+2. **Analyze root cause**: Identify whether it's unclear Prompt expression, insufficient constraints, or missing examples
+3. **Generate variants**: Based on defect analysis, generate 3~5 Prompt variants
+4. **Evaluate and select**: Use historical chapters for backtesting, select the variant with maximum Fitness improvement
+5. **Progressive replacement**: New variants only take effect for subsequent new chapters, not affecting historical works
 
-### 智能上下文管理
+### Smart Context Management
 
-Writer 不是盲目堆上下文，而是分层组装：
+Writer doesn't blindly stack context, but assembles it in layers:
 
-| 上下文层 | 内容 | 来源 |
-|----------|------|------|
-| 近史全文 | 前 4 章完整正文 | `raw.txt` |
-| 近史摘要 | 前 5 章章节摘要 | `summary.txt` |
-| 远史压缩 | 更早章节的极度压缩梗概 | `compress-distant` prompt |
-| 世界观 | 角色、设定、剧情线、地图 | SQLite 记忆库 |
-| RAG 检索 | 语义相似的历史章节/角色/设定 | 向量相似度 Top-3 |
-| 反重复提醒 | 近史已出现的情节/桥段 | `antiRepeat` 自动提取 |
-| 角色记忆 | 目标角色的近期经历 | `character-memory.js` |
-| 声纹约束 | 目标角色的对话风格 | `voice-fingerprint.js` |
+| Context Layer | Content | Source |
+|--------------|---------|--------|
+| Near History Full Text | Full text of previous 4 chapters | `raw.txt` |
+| Near History Summary | Chapter summaries of previous 5 chapters | `summary.txt` |
+| Far History Compression | Ultra-compressed synopsis of earlier chapters | `compress-distant` prompt |
+| Worldview | Characters, settings, plotlines, maps | SQLite memory database |
+| RAG Retrieval | Semantically similar historical chapters/settings | Top-3 vector similarity |
+| Anti-Repetition Reminder | Plot elements already appeared in near history | `antiRepeat` auto-extraction |
+| Character Memory | Target character's recent experiences | `character-memory.js` |
+| Voice Constraints | Target character's dialogue style | `voice-fingerprint.js` |
 
-### 双策略模式
+### Dual Strategy Modes
 
-- **`knowrite`**（默认）：7 Agent 全量流水线，质量优先
-- **`pipeline`**：轻量单模型快速模式，速度优先
+- **`knowrite`** (default): 7-Agent full pipeline, quality-first
+- **`pipeline`**: Lightweight single-model fast mode, speed-first
 
-运行时通过 `strategy` 参数切换，同一作品可在不同章节使用不同策略。
+Switch at runtime via `strategy` parameter; same work can use different strategies for different chapters.
 
-### 作家轮换
+### Writer Rotation
 
-多模型按章节轮询，避免单一模型风格固化。在「设置 → 模型配置」中配置 `writerRotation.models`，系统自动轮换。
+Multi-model chapter-by-chapter rotation to avoid single-model style固化. Configure `writerRotation.models` in "Settings → Model Config", system automatically rotates.
 
-### 世界观记忆库
+### Worldview Memory Database
 
-完整的世界构建数据模型：
+Complete world-building data model:
 
-| 实体 | 用途 |
-|------|------|
-| **Character** | 角色档案、关系网络、出场记录 |
-| **WorldLore** | 世界观设定、势力分布、历史事件 |
-| **PlotLine / PlotNode** | 剧情线结构和节点状态 |
-| **MapRegion / MapConnection** | 地图区域和连通关系 |
-| **StoryTemplate** | 套路模板库（可复用的情节结构） |
+| Entity | Purpose |
+|--------|---------|
+| **Character** | Character profiles, relationship networks, appearance records |
+| **WorldLore** | Worldview settings, force distribution, historical events |
+| **PlotLine / PlotNode** | Plotline structure and node status |
+| **MapRegion / MapConnection** | Map regions and connectivity |
+| **StoryTemplate** | Template pattern library (reusable plot structures) |
 
-所有数据通过 REST API CRUD 管理，写作时自动注入上下文。
+All data managed through REST API CRUD, automatically injected into context during writing.
 
-### 输入治理（Input Governance）
+### Input Governance
 
-写作前零 LLM 调用的意图编译与上下文选择：
+Zero-LLM-call intent compilation and context selection before writing:
 
-| 层级 | 实体 | 作用 |
-|------|------|------|
-| **L1 长期愿景** | `AuthorIntent` | 作品级主题、约束、必须保留/避免 |
-| **L2 当前焦点** | `CurrentFocus` | 短期创作目标（目标章节数、优先级、过期时间） |
-| **L3 章节意图** | `ChapterIntent` | 单章 mustKeep / mustAvoid / 场景节拍 / 情感目标 / 规则栈 |
+| Layer | Entity | Purpose |
+|-------|--------|---------|
+| **L1 Long-term Vision** | `AuthorIntent` | Work-level themes, constraints, must-keep/avoid |
+| **L2 Current Focus** | `CurrentFocus` | Short-term creative goals (target chapter count, priority, expiration) |
+| **L3 Chapter Intent** | `ChapterIntent` | Single-chapter mustKeep / mustAvoid / scene beats / emotional goals / rule stack |
 
-流程：`planChapter()` 编译意图 → `composeChapter()` 选择真相片段 + 世界观上下文 → `getGovernanceVariables()` 注入 Writer prompt。
+Flow: `planChapter()` compiles intent → `composeChapter()` selects truth fragments + worldview context → `getGovernanceVariables()` injects into Writer prompt.
 
-### 时序真相数据库（Temporal Truth DB）
+### Temporal Truth Database
 
-事件溯源驱动的世界状态追踪，支持时间旅行查询：
+Event-sourcing driven world state tracking, supporting time-travel queries:
 
-- **事件流** (`TruthEvent`)：不可变追加，记录角色位置变化、伏笔创建、资源获取等
-- **物化视图** (`TruthState`)：任意章节的历史状态快照
-- **承诺追踪** (`TruthHook`)：伏笔/悬念的创建与解析状态
-- **资源账本** (`TruthResource`)：物品数量与流转历史
+- **Event stream** (`TruthEvent`): Immutable append-only, records character position changes, foreshadowing creation, resource acquisition, etc.
+- **Materialized views** (`TruthState`): Historical state snapshots at any chapter
+- **Promise tracking** (`TruthHook`): Foreshadowing/suspense creation and resolution status
+- **Resource ledger** (`TruthResource`): Item quantities and transfer history
 
-每章 Summarizer 完成后自动提取 delta 事件，Editor 和 Reader 可查询角色状态、检测资源矛盾。
+After each chapter's Summarizer completes, automatically extracts delta events; Editor and Reader can query character states and detect resource contradictions.
 
-### 全维度作者指纹（Author Fingerprint）
+### Full-Dimension Author Fingerprint
 
-5 层风格指纹分析 + 自动注入 + 合规检测：
+Five-layer style fingerprint analysis + auto-injection + compliance detection:
 
-| 层级 | 分析维度 | 检测内容 |
-|------|----------|----------|
-| **叙事层** | POV、场景切换、章节结构 | 视角一致性、过渡方式 |
-| **角色层** | 命名习惯、角色声音 | 命名模式、对话特征 |
-| **情节层** | 章节结构、节拍密度 | 节奏分布、冲突密度 |
-| **语言层** | 句长分布、词频、对话比 | 句式多样性、高频词 |
-| **世界观层** | 设定类型、力量体系 | 设定复杂度、一致性 |
+| Layer | Analysis Dimension | Detection Content |
+|-------|-------------------|-------------------|
+| **Narrative** | POV, scene switching, chapter structure | Perspective consistency, transition methods |
+| **Character** | Naming habits, character voice | Naming patterns, dialogue characteristics |
+| **Plot** | Chapter structure, beat density | Rhythm distribution, conflict density |
+| **Language** | Sentence length distribution, word frequency, dialogue ratio | Sentence diversity, frequent words |
+| **Worldview** | Setting types, power systems | Setting complexity, consistency |
 
-统计提取 + LLM 风格指南提取双模式，写作前自动注入约束，写作后检测风格偏离。
+Statistical extraction + LLM style guide extraction dual mode; auto-injects constraints before writing, detects style deviation after writing.
 
-### 输出治理（Output Governance）
+### Output Governance
 
-生产者-消费者解耦的出版前验证管道：
+Producer-consumer decoupled pre-publication verification pipeline:
 
-- **L1 自动验证**：真相一致性、风格合规、格式校验、内容策略
-- **L2 LLM 验证**：可读性、情感连续性、反 AI 检测
-- **状态机**：`pending → validating → approved | rejected → human_review → released`
-- **手动闸门**：必须通过 `release` 操作才算正式发布
+- **L1 Auto-verification**: Truth consistency, style compliance, format validation, content policy
+- **L2 LLM verification**: Readability, emotional continuity, anti-AI detection
+- **State machine**: `pending → validating → approved | rejected → human_review → released`
+- **Manual gate**: Must pass `release` operation to be officially published
 
-### Agent 级模型配置
+### Agent-Level Model Configuration
 
-突破「一个默认模型走天下」的局限，为每个 Agent 角色独立分配 Provider 和模型：
+Breaks the "one default model for all" limitation by independently assigning Provider and model for each Agent role:
 
-- **三级优先级链**：`agentModels[role]` > `roleDefaults[role]` > `provider default`
-- **独立配置**：每个 Agent 可单独设置 Provider、Model、Temperature
-- **批量管理**：支持一次性保存全部 Agent 模型分配
-- **前端面板**：「设置 → Agent 模型分配」可视化表格，支持从 roleDefaults 一键同步
+- **Three-level priority chain**: `agentModels[role]` > `roleDefaults[role]` > `provider default`
+- **Independent config**: Each Agent can separately set Provider, Model, Temperature
+- **Batch management**: Supports one-click save of all Agent model assignments
+- **Frontend panel**: "Settings → Agent Model Assignment" visual table, supports one-click sync from roleDefaults
 
-### Plan 模式（章节预演）
+### Plan Mode (Chapter Preview)
 
-Writer 动笔前，先由 Planner Agent 生成本章叙事节拍，作者确认后再进入完整写作流水线：
+Before Writer starts, Planner Agent generates narrative beats for this chapter; author confirms before entering full writing pipeline:
 
-- **叙事节拍**：类型 / 描述 / 字数 / 必须包含元素
-- **整体基调**：文风、节奏、情感走向
-- **风险提示**：潜在偏离、逻辑漏洞预警
-- **确认续写**：Plan 确认后自动注入 Writer prompt，无缝衔接流水线
-- **独立页面**：`/plan?workId=xxx` 独立预演页面，WorksPage 一键弹出 plan modal
+- **Narrative beats**: Type / description / word count / must-include elements
+- **Overall tone**: Writing style, pacing, emotional direction
+- **Risk alerts**: Potential deviations, logic hole warnings
+- **Confirm and continue**: After Plan confirmation, auto-injected into Writer prompt, seamlessly connecting to pipeline
+- **Independent page**: `/plan?workId=xxx` independent preview page, WorksPage one-click plan modal
 
-### 动态流水线配置
+### Dynamic Pipeline Configuration
 
-7 Agent 写作流水线不再是「全量 or  nothing」，可灵活开关和自动跳过：
+7-Agent writing pipeline is no longer "all or nothing" — stages can be flexibly toggled and auto-skipped:
 
-- **阶段开关**：Writer / Editor / Humanizer / Proofreader / Reader / Summarizer / Fitness 可独立启用/禁用
-- **Plan 模式开关**：全局控制是否启用章节预演
-- **AutoSkip**：基于 Fitness 历史自动跳过价值低的阶段（如连续多章 Editor 通过率 100%，则后续自动跳过 Proofreader）
-- **前端配置**：「设置 → 流水线配置」Tab 可视化控制
+- **Stage toggles**: Writer / Editor / Humanizer / Proofreader / Reader / Summarizer / Fitness can be independently enabled/disabled
+- **Plan mode toggle**: Global control over whether chapter preview is enabled
+- **AutoSkip**: Automatically skips low-value stages based on Fitness history (e.g., if Editor pass rate is 100% for consecutive chapters, subsequent chapters auto-skip Proofreader)
+- **Frontend config**: "Settings → Pipeline Config" Tab for visual control
 
-### Trace 调试台
+### Trace Debugger
 
-LLM 调用全链路可追溯，排查「为什么写得不好」的利器：
+Full LLM call chain traceability — a powerful tool for investigating "why it didn't write well":
 
-- **调用统计**：各 Agent 调用次数、Token 消耗、平均耗时
-- **时间线视图**：按章节时间排序的完整调用链
-- **Agent 筛选**：单 Agent 历史记录追溯
-- **双源读取**：DB (fileStore) + 本地文件系统，优先读文件系统
-- **前端调试台**：`/traces` 独立页面，Agent 统计卡片 + 调用时间线 + 详细记录筛选
+- **Call statistics**: Per-Agent call count, token consumption, average latency
+- **Timeline view**: Complete call chain sorted by chapter time
+- **Agent filtering**: Single Agent historical record tracing
+- **Dual-source reading**: DB (fileStore) + local file system, prioritizing file system
+- **Frontend debugger**: `/traces` independent page, Agent stat cards + call timeline + detailed record filtering
 
 ---
 
-## 工作原理
+## How It Works
 
-### 完整管线流程
+### Complete Pipeline Flow
 
 ```
-用户请求 → POST /api/novel/start 或 /api/novel/continue
+User Request → POST /api/novel/start or /api/novel/continue
     │
-    ├─→ 0. 输入治理：planChapter → composeChapter → 治理变量注入 Writer prompt
-    │       ├─ AuthorIntent（长期愿景）
-    │       ├─ CurrentFocus（当前焦点）
-    │       └─ ChapterIntent（章节意图 + 规则栈）
+    ├─→ 0. Input Governance: planChapter → composeChapter → governance variables injected into Writer prompt
+    │       ├─ AuthorIntent (long-term vision)
+    │       ├─ CurrentFocus (current focus)
+    │       └─ ChapterIntent (chapter intent + rule stack)
     │
-    ├─→ 1. 上下文编译：大纲 + 近史全文 + 远史压缩 + 世界观 + RAG 检索 + 反重复提醒 + 角色记忆 + 声纹约束 + 真相片段
-    │       └─ 作者指纹约束注入（叙事/角色/情节/语言/世界 5 层）
+    ├─→ 1. Context Compilation: outline + near history full text + far history compression + worldview + RAG retrieval + anti-repetition reminder + character memory + voice constraints + truth fragments
+    │       └─ Author fingerprint constraints injection (narrative/character/plot/language/world 5 layers)
     │
-    ├─→ 2. Writer：生成初稿 → raw.txt
-    ├─→ 3. Editor：结构化评审 → [是]/[否]（头尾组合预览，支持长章节审阅）
-    │       └─ 不通过 → 改稿 → 再评审（最多 3 轮）
-    ├─→ 4. Humanizer：去 AI 化 → humanized.txt
-    ├─→ 5. Proofreader：校编润色 → final.txt（自由风跳过）
-    ├─→ 6. Reader：模拟读者反馈 → feedback.json
-    ├─→ 7. Summarizer：生成摘要 → summary.txt
-    │       └─ 时序真相：提取 delta 事件 → TruthEvent / TruthState / TruthHook / TruthResource
-    ├─→ 8. RAG 索引：embedding → SQLite
-    ├─→ 9. Fitness 评估：5 维评分 → fitness.json
-    ├─→ 10. 角色记忆：提取角色经历 → CharacterMemory
-    ├─→ 11. 声纹更新：解析对话 → VoiceFingerprint
-    └─→ 12. 输出治理：enqueue → L1 自动验证 → L2 LLM 验证 → human_review → release
+    ├─→ 2. Writer: generates draft → raw.txt
+    ├─→ 3. Editor: structured review → [YES]/[NO] (head-tail combo preview, supports long chapter review)
+    │       └─ Not passed → revise → re-review (up to 3 rounds)
+    ├─→ 4. Humanizer: de-AI processing → humanized.txt
+    ├─→ 5. Proofreader: proofreading → final.txt (skipped in free mode)
+    ├─→ 6. Reader: simulated reader feedback → feedback.json
+    ├─→ 7. Summarizer: generates summary → summary.txt
+    │       └─ Temporal truth: extracts delta events → TruthEvent / TruthState / TruthHook / TruthResource
+    ├─→ 8. RAG Indexing: embedding → SQLite
+    ├─→ 9. Fitness Assessment: 5-dimension scoring → fitness.json
+    ├─→ 10. Character Memory: extracts character experiences → CharacterMemory
+    ├─→ 11. Voice Update: parses dialogue → VoiceFingerprint
+    └─→ 12. Output Governance: enqueue → L1 auto-verification → L2 LLM verification → human_review → release
 ```
 
-### 记忆系统架构
+### Memory System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              输入治理层                                    │
+│                           Input Governance Layer                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │ AuthorIntent │  │ CurrentFocus │  │ ChapterIntent│  │  规则栈编译   │ │
-│  │  长期愿景     │  │   当前焦点    │  │  章节意图     │  │   L1→L4     │ │
+│  │ AuthorIntent │  │ CurrentFocus │  │ ChapterIntent│  │ Rule Stack   │ │
+│  │ Long-term    │  │ Current      │  │ Chapter      │  │ L1→L4        │ │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘ │
 │         └──────────────────┴──────────────────┘                 │         │
 │                              │                                  │         │
 ├──────────────────────────────┼──────────────────────────────────┼─────────┤
-│                         智能上下文编译器                             │         │
+│                         Smart Context Compiler                          │         │
 │  ┌─────────┐ ┌─────────┐ ┌───────────┐ ┌─────────┐ ┌───────────┐ │         │
-│  │ 近史全文 │ │ 近史摘要 │ │ 远史压缩   │ │ 世界观库 │ │ RAG检索   │ │         │
-│  │ (前4章) │ │ (前5章) │ │ (更早章)   │ │ SQLite  │ │ Top-3    │ │         │
+│  │ Near    │ │ Near    │ │ Far       │ │ World   │ │ RAG       │ │         │
+│  │ History │ │ History │ │ History   │ │ Database│ │ Retrieval │ │         │
+│  │ Full    │ │ Summary │ │ Compression│ │ SQLite  │ │ Top-3    │ │         │
 │  └────┬────┘ └────┬────┘ └─────┬─────┘ └────┬────┘ └────┬────┘ │         │
 │       └─────────────┴────────────┘          └─────────────┘      │         │
 │                   │                                  │            │         │
 │  ┌─────────┐ ┌─────────┐ ┌───────────┐  ┌──────────────┐        │         │
-│  │反重复提醒│ │真相片段  │ │作者指纹   │  │  输入治理变量  │        │         │
-│  │自动提取  │ │时序查询  │ │5层约束   │  │  mustKeep等   │        │         │
+│  │Anti-    │ │Truth    │ │Author     │  │ Input Gov    │        │         │
+│  │Repeat   │ │Fragments│ │Fingerprint│  │ Variables    │        │         │
+│  │Auto-    │ │Temporal │ │5-Layer   │  │ mustKeep etc │        │         │
+│  │extract  │ │Query    │ │Constraints│  │              │        │         │
 │  └────┬────┘ └────┬────┘ └─────┬─────┘  └──────┬───────┘        │         │
 │       └─────────────┴────────────┘             │                 │         │
 │                   │                            │                 │         │
 │  ┌─────────┐ ┌─────────┐                      │                 │         │
-│  │角色记忆  │ │声纹约束  │                      │                 │         │
-│  │经历注入  │ │对话风格  │                      │                 │         │
+│  │Character│ │Voice    │                      │                 │         │
+│  │Memory   │ │Constraints│                    │                 │         │
+│  │Injection│ │Dialogue  │                      │                 │         │
 │  └────┬────┘ └────┬────┘                      │                 │         │
 │       └─────────────┴──────────────────────────┘                 │         │
 │                   │                                              │         │
-│              注入 Writer ◄───────────────────────────────────────┘         │
+│              Injected into Writer ◄───────────────────────────────┘         │
 ├──────────────────────────────────────────────────────────────────────────┤
-│                              输出治理层                                    │
+│                           Output Governance Layer                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   L1 自动验证 │  │  L2 LLM 验证  │  │  风格合规检测  │  │  真相一致性   │ │
-│  │  格式/策略   │  │  可读/情感   │  │  作者指纹对比  │  │  时序数据库   │ │
+│  │ L1 Auto-     │  │ L2 LLM       │  │ Style        │  │ Truth        │ │
+│  │ Verification │  │ Verification │  │ Compliance   │  │ Consistency  │ │
+│  │ Format/Policy│  │ Readability  │  │ Fingerprint  │  │ Temporal DB  │ │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘ │
 │         └──────────────────┴──────────────────┘                 │         │
 │                              │                                  │         │
@@ -421,121 +426,121 @@ LLM 调用全链路可追溯，排查「为什么写得不好」的利器：
 
 ---
 
-## API 概览
+## API Overview
 
-### 小说创作（SSE 流式）
+### Novel Creation (SSE Streaming)
 
 ```bash
-# 创建作品
+# Create a work
 curl -X POST http://localhost:8000/api/novel/start \
   -H "Content-Type: application/json" \
-  -d '{"topic":"修仙小说","platformStyle":"番茄","authorStyle":"热血","strategy":"knowrite"}'
+  -d '{"topic":"Cultivation Novel","platformStyle":"Fanqie","authorStyle":"Hot-blooded","strategy":"knowrite"}'
 
-# 续写下一章
+# Continue next chapter
 curl -X POST http://localhost:8000/api/novel/continue \
   -H "Content-Type: application/json" \
   -d '{"workId":"xxx"}'
 
-# 章节预演（Plan 模式，SSE 流式）
+# Chapter preview (Plan mode, SSE streaming)
 curl -X POST http://localhost:8000/api/novel/plan \
   -H "Content-Type: application/json" \
   -d '{"workId":"xxx","chapterNumber":5}'
 
-# 导入已有章节续写
+# Import existing chapter for continuation
 curl -X POST http://localhost:8000/api/novel/import \
   -H "Content-Type: application/json" \
-  -d '{"workId":"xxx","content":"第1章 ..."}'
+  -d '{"workId":"xxx","content":"Chapter 1 ..."}'
 
-# 大纲偏离检测
+# Outline deviation detection
 curl -X POST http://localhost:8000/api/novel/deviate \
   -H "Content-Type: application/json" \
   -d '{"workId":"xxx","chapterNumber":5}'
 
-# 纲章矫正重写
+# Outline correction rewrite
 curl -X POST http://localhost:8000/api/novel/correct \
   -H "Content-Type: application/json" \
   -d '{"workId":"xxx","chapterNumber":5}'
 
-# 获取作品详情（含章节文本、Fitness、评审记录）
+# Get work details (chapter text, Fitness, review records)
 curl http://localhost:8000/api/novel/works/:workId
 
-# 删除作品（级联删除 DB + 文件 + 本地目录）
+# Delete work (cascading delete DB + files + local directory)
 curl -X DELETE http://localhost:8000/api/novel/works/:workId
 ```
 
-### 对话式创作代理
+### Chat Agent
 
 ```bash
-# 与作品对话（SSE 流式）
+# Chat with work (SSE streaming)
 curl -X POST http://localhost:8000/api/chat-agent \
   -H "Content-Type: application/json" \
   -d '{
     "workId": "xxx",
-    "messages": [{"role": "user", "content": "把第三章的战斗写得更激烈一些"}]
+    "messages": [{"role": "user", "content": "Make the battle in Chapter 3 more intense"}]
   }'
 ```
 
-### 拆书分析
+### Book Deconstruction
 
 ```bash
-# 拆解小说文本
+# Deconstruct novel text
 curl -X POST http://localhost:8000/api/book-deconstruct \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "第一章 ...",
-    "title": "斗破苍穹",
-    "author": "天蚕土豆"
+    "text": "Chapter 1 ...",
+    "title": "Battle Through the Heavens",
+    "author": "Heavenly Silkworm Potato"
   }'
 
-# 基于拆解结果一键创建模板
+# One-click create template from deconstruction results
 curl -X POST http://localhost:8000/api/book-deconstruct/artifacts \
   -H "Content-Type: application/json" \
   -d '{"analysis": {...}}'
 ```
 
-### Skill 萃取
+### Skill Extraction
 
 ```bash
-# 查看当前作品可用的 Skill
+# View available Skills for current work
 curl http://localhost:8000/api/skills?workId=xxx
 
-# 手动触发 Skill 萃取
+# Manually trigger Skill extraction
 curl -X POST http://localhost:8000/api/skills/extract/xxx \
   -H "Content-Type: application/json" \
   -d '{"minFitness": 0.85, "minConsecutive": 3}'
 
-# 获取 Skill 注入文本
+# Get Skill injection text
 curl http://localhost:8000/api/skills/injection/xxx
 ```
 
-### 角色记忆
+### Character Memory
 
 ```bash
-# 获取角色记忆注入文本
+# Get character memory injection text
 curl http://localhost:8000/api/novel/works/:workId/character-memories
 
-# 从摘要提取角色经历
+# Extract character experiences from summary
 curl -X POST http://localhost:8000/api/novel/works/:workId/character-memories/extract \
   -H "Content-Type: application/json" \
   -d '{"chapterNumber": 5, "summaryText": "..."}'
 
-# 获取某角色的记忆文件
+# Get a character's memory file
 curl http://localhost:8000/api/novel/works/:workId/character-memories/:charName/file
 ```
 
-### 声纹字典
+### Voice Fingerprint
 
 ```bash
-# 获取声纹注入文本
+# Get voice fingerprint injection text
 curl http://localhost:8000/api/novel/works/:workId/voice-fingerprints
 
-# 从章节提取声纹
+# Extract voice fingerprint from chapter
 curl -X POST http://localhost:8000/api/novel/works/:workId/voice-fingerprints/extract \
   -H "Content-Type: application/json" \
   -d '{"chapterNumber": 5, "chapterText": "..."}'
 ```
 
-### OpenAI 兼容接口
+### OpenAI-Compatible Interface
 
 ```bash
 curl http://localhost:8000/v1/chat/completions \
@@ -543,69 +548,69 @@ curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "deepseek-v3",
-    "messages": [{"role": "user", "content": "你好"}],
+    "messages": [{"role": "user", "content": "Hello"}],
     "stream": true
   }'
 ```
 
-### 世界上下文管理
+### World Context Management
 
 ```bash
-# 角色 CRUD
+# Character CRUD
 GET    /api/world/:workId/characters
 POST   /api/world/:workId/characters
 PUT    /api/world/:workId/characters/:id
 DELETE /api/world/:workId/characters/:id
 
-# 设定 lore / 剧情线 / 地图 / 套路模板 类似
+# Lore / PlotLines / Map / Templates similarly
 GET/POST/PUT/DELETE /api/world/:workId/lore
 GET/POST/PUT/DELETE /api/world/:workId/plot-lines
 GET/POST/PUT/DELETE /api/world/:workId/map-regions
 GET/POST/PUT/DELETE /api/templates
 ```
 
-### 时序真相数据库
+### Temporal Truth Database
 
 ```bash
-# 查询角色/物品/伏笔在任意章节的状态（时间旅行）
+# Time-travel query: character/item/hook state at any chapter
 GET /api/truth/state/:workId?subjectType=character&subjectId=xxx&chapterNumber=5
 
-# 查询活跃伏笔（截至某章未解析）
+# Active hooks (unresolved as of chapter)
 GET /api/truth/hooks/:workId?asOfChapter=5
 
-# 查询资源账本
+# Resource ledger
 GET /api/truth/resources/:workId?resourceName=xxx&asOfChapter=5
 
-# 查询所有状态变化事件
+# All state change events
 GET /api/truth/events/:workId?subjectType=character&subjectId=xxx
 
-# 生成 truth 投影（Markdown 真相文件）
+# Generate truth projection (Markdown truth file)
 POST /api/truth/projection/:workId?chapterNumber=5
 
-# 检查连续性
+# Check continuity
 POST /api/truth/continuity/:workId?chapterNumber=5
 ```
 
-### 作者指纹
+### Author Fingerprint
 
 ```bash
-# 创建/更新指纹
+# Create/update fingerprint
 POST /api/style/fingerprints
 
-# 为作品关联指纹
+# Associate fingerprint with work
 POST /api/style/works/:workId/fingerprints
 
-# 分析文本生成指纹
+# Analyze text to generate fingerprint
 POST /api/style/analyze
 
-# 获取作品活跃指纹
+# Get work's active fingerprint
 GET /api/style/works/:workId/fingerprints
 
-# 验证风格合规
+# Verify style compliance
 POST /api/style/verify/:workId?chapterNumber=5
 ```
 
-### 输入治理
+### Input Governance
 
 ```bash
 # AuthorIntent CRUD
@@ -622,98 +627,98 @@ DELETE /api/input-governance/current-focus/:focusId
 GET /api/input-governance/chapter-intent/:workId/:chapterNumber
 PUT /api/input-governance/chapter-intent/:workId/:chapterNumber
 
-# plan + compose（写作前自动调用）
+# plan + compose (auto-called before writing)
 POST /api/input-governance/plan/:workId/:chapterNumber
 POST /api/input-governance/compose/:workId/:chapterNumber
 
-# 获取治理变量（供调试）
+# Get governance variables (for debugging)
 GET /api/input-governance/governance-variables/:workId/:chapterNumber
 ```
 
-### 输出治理
+### Output Governance
 
 ```bash
-# 查看队列状态
+# View queue status
 GET /api/output/queue/:workId
 
-# 手动触发验证
+# Manually trigger verification
 POST /api/output/validate/:workId/:chapterNumber
 
-# 手动发布（通过 human_review 闸门）
+# Manual release (pass human_review gate)
 POST /api/output/release/:workId/:chapterNumber
   -d '{"reviewer": "human"}'
 
-# 查看验证规则
+# View verification rules
 GET /api/output/rules
 
-# 添加/更新规则
+# Add/update rules
 POST /api/output/rules
 ```
 
-### Trace 调试台
+### Trace Debugger
 
 ```bash
-# 查询调用记录（支持 agentType、时间范围、分页）
+# Query call records (supports agentType, time range, pagination)
 GET /api/traces/:workId?agentType=writer&limit=50&offset=0
 
-# 各 Agent 调用统计
+# Per-Agent call statistics
 GET /api/traces/:workId/stats
 
-# 按时间排序的调用链
+# Time-sorted call chain
 GET /api/traces/:workId/timeline?chapterNumber=5
 
-# 单个 Agent 的历史记录
+# Single Agent history
 GET /api/traces/:workId/agent/:agentType?limit=100
 ```
 
-### 设置与进化
+### Settings & Evolution
 
 ```bash
-GET  /api/settings          # 全局配置
-GET  /api/prompts           # Prompt 模板列表
-POST /api/evolve            # Prompt 进化实验
+GET  /api/settings          # Global config
+GET  /api/prompts           # Prompt template list
+POST /api/evolve            # Prompt evolution experiment
 
-# Agent 级模型配置
+# Agent-level model config
 GET    /api/novel/settings/agent-models
 GET    /api/novel/settings/agent-models/:role
 POST   /api/novel/settings/agent-models/:role
 DELETE /api/novel/settings/agent-models/:role
-POST   /api/novel/settings/agent-models        # 批量保存
+POST   /api/novel/settings/agent-models        # Batch save
 
-# 动态流水线配置
+# Dynamic pipeline config
 GET  /api/novel/engine/pipeline
 POST /api/novel/engine/pipeline
 ```
 
-### MCP 端点
+### MCP Endpoints
 
 ```bash
-# SSE 连接（Cursor / Claude Code 配置）
+# SSE connection (Cursor / Claude Code config)
 GET /mcp/sse
 
-# JSON-RPC 消息通道
+# JSON-RPC message channel
 POST /mcp/message
 ```
 
 ---
 
-## Docker 部署
+## Docker Deployment
 
-### 快速启动
+### Quick Start
 
 ```bash
-# 1. 复制环境变量模板并编辑
+# 1. Copy environment variable template and edit
 cp .env.example .env
-# 编辑 .env，配置 PROVIDER、PROXY_URL 等
+# Edit .env, configure PROVIDER, PROXY_URL, etc.
 
-# 2. 使用 Docker Compose 启动
+# 2. Start with Docker Compose
 docker-compose up -d
 
-# 3. 查看健康状态
+# 3. Check health status
 curl http://localhost:8000/health
 ```
 
-### 手动构建
+### Manual Build
 
 ```bash
 docker build -t knowrite:latest .
@@ -723,110 +728,110 @@ docker run -p 8000:8000 --env-file .env \
   knowrite:latest
 ```
 
-### 持久化卷
+### Persistent Volumes
 
-| 卷名 | 路径 | 说明 |
-|------|------|------|
-| `knowrite-data` | `/app/data` | SQLite 数据库 |
-| `knowrite-works` | `/app/works` | 作品本地备份 |
-| `knowrite-logs` | `/app/logs` | 运行日志 |
-
----
-
-## 技术栈
-
-| 层 | 技术 |
-|---|---|
-| 运行时 | Node.js 24+ |
-| 框架 | Express 4 |
-| 数据库 | SQLite + Sequelize 6 |
-| 模型调用 | OpenAI-compatible HTTP API（用户配置任意 Provider） |
-| Embedding | OpenAI `/v1/embeddings`（复用同一 Provider） |
-| 向量检索 | 纯 JS 余弦相似度（零外部向量库依赖） |
-| 流式输出 | Server-Sent Events (SSE) |
-| 配置 | `config/*.json` 静态配置 + DB 动态配置（模型全用户自定义） |
-| 校验 | Zod Schema（请求参数校验） |
-| 安全 | Bearer Token / API Key、CORS、Rate Limit、路径遍历防护、AES-256-GCM 加密 |
-| 作品存储 | SQLite 主存储 + `works/` 目录本地文件双写 |
-| 容器化 | Docker + Docker Compose |
-| 测试 | Jest + Supertest |
+| Volume | Path | Description |
+|--------|------|-------------|
+| `knowrite-data` | `/app/data` | SQLite database |
+| `knowrite-works` | `/app/works` | Work local backups |
+| `knowrite-logs` | `/app/logs` | Runtime logs |
 
 ---
 
-## 项目结构
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Node.js 24+ |
+| Framework | Express 4 |
+| Database | SQLite + Sequelize 6 |
+| Model Calls | OpenAI-compatible HTTP API (user-configured Provider) |
+| Embedding | OpenAI `/v1/embeddings` (reuses same Provider) |
+| Vector Retrieval | Pure JS cosine similarity (zero external vector DB dependency) |
+| Streaming | Server-Sent Events (SSE) |
+| Config | `config/*.json` static config + DB dynamic config (all models user-defined) |
+| Validation | Zod Schema (request parameter validation) |
+| Security | Bearer Token / API Key, CORS, Rate Limit, path traversal protection, AES-256-GCM encryption |
+| Work Storage | SQLite primary storage + `works/` directory local file dual-write |
+| Containerization | Docker + Docker Compose |
+| Testing | Jest + Supertest |
+
+---
+
+## Project Structure
 
 ```
 knowrite/
 ├── src/
-│   ├── server.js                  # Express 入口（CORS/限流/认证/路由/MCP）
+│   ├── server.js                  # Express entry (CORS/rate-limit/auth/routes/MCP)
 │   ├── core/
-│   │   ├── chat.js                # 统一 chat 入口（所有 Provider 走 OpenAI 兼容协议）
-│   │   └── paths.js               # 路径工具 + workId sanitize
+│   │   ├── chat.js                # Unified chat entry (all Providers via OpenAI-compatible protocol)
+│   │   └── paths.js               # Path utils + workId sanitize
 │   ├── mcp/
-│   │   └── server.js              # MCP 服务器（JSON-RPC 2.0 + SSE）
+│   │   └── server.js              # MCP server (JSON-RPC 2.0 + SSE)
 │   ├── middleware/
-│   │   ├── auth.js                # Bearer Token / X-API-Key 认证
-│   │   └── validator.js           # Zod Schema 请求参数校验
+│   │   ├── auth.js                # Bearer Token / X-API-Key auth
+│   │   └── validator.js           # Zod Schema request validation
 │   ├── models/
-│   │   └── index.js               # Sequelize + SQLite 模型（30+ 张表）
+│   │   └── index.js               # Sequelize + SQLite models (30+ tables)
 │   ├── providers/
 │   │   ├── base-provider.js
 │   │   ├── factory.js
-│   │   └── openai/                # OpenAI 兼容 Provider（chat + embed）
+│   │   └── openai/                # OpenAI-compatible Provider (chat + embed)
 │   ├── routes/
-│   │   ├── novel.js                  # 小说创作 API（start/continue/plan/import/deviate/correct/delete）
-│   │   ├── chat-agent.js             # 对话式创作代理（SSE）
-│   │   ├── book-deconstructor.js     # 拆书分析
-│   │   ├── character-memory.js       # 角色专属记忆
-│   │   ├── voice-fingerprint.js      # 人设声纹字典
-│   │   ├── skill-extractor.js        # Skill 萃取
-│   │   ├── world-context.js          # 世界观 CRUD
-│   │   ├── templates.js              # 套路模板管理
-│   │   ├── temporal-truth.js         # 时序真相数据库 API
-│   │   ├── author-fingerprint.js     # 作者指纹 API
-│   │   ├── output-governance.js      # 输出治理 API
-│   │   ├── input-governance.js       # 输入治理 API
-│   │   └── traces.js                 # Trace 调试台 API（query/stats/timeline/agentTraces）
+│   │   ├── novel.js               # Novel creation API (start/continue/plan/import/deviate/correct/delete)
+│   │   ├── chat-agent.js          # Chat Agent (SSE)
+│   │   ├── book-deconstructor.js  # Book deconstruction
+│   │   ├── character-memory.js    # Character episodic memory
+│   │   ├── voice-fingerprint.js   # Voice fingerprint dictionary
+│   │   ├── skill-extractor.js     # Skill extraction
+│   │   ├── world-context.js       # Worldview CRUD
+│   │   ├── templates.js           # Template pattern management
+│   │   ├── temporal-truth.js      # Temporal truth database API
+│   │   ├── author-fingerprint.js  # Author fingerprint API
+│   │   ├── output-governance.js   # Output governance API
+│   │   ├── input-governance.js    # Input governance API
+│   │   └── traces.js              # Trace debugger API (query/stats/timeline/agentTraces)
 │   ├── schemas/
-│   │   ├── chat.js                # Chat 相关 Zod Schema
-│   │   ├── novel.js               # Novel 相关 Zod Schema
-│   │   └── routes.js              # 路由通用 Zod Schema
+│   │   ├── chat.js                # Chat Zod Schema
+│   │   ├── novel.js               # Novel Zod Schema
+│   │   └── routes.js              # Route common Zod Schema
 │   └── services/
-│       ├── novel-engine.js           # 核心创作引擎（knowrite / pipeline 双策略）
-│       ├── novel/                    # novel-engine.js 拆分子模块
-│       │   ├── chapter-writer.js         # 7-Agent / Pipeline 写作管道（阶段跳过 + AutoSkip）
-│       │   ├── chapter-planner.js        # Plan 模式 — 章节节拍规划（SSE）
-│       │   ├── chapter-processor.js      # 摘要/反馈/Fitness/Truth-Delta/角色记忆/声纹 后处理
-│       │   ├── context-builder.js        # 滚动上下文 + RAG + 反重复 + 角色记忆 + 声纹
-│       │   ├── outline-generator.js      # 大纲生成（主题/详细/多卷/分卷）
-│       │   ├── edit-reviewer.js          # 编辑审阅 + verdict 解析
-│       │   └── novel-utils.js            # 纯工具函数
-│       ├── fitness-evaluator.js      # 5 维 Fitness 评估
-│       ├── vector-store.js           # 向量存储（HNSW + SQLite + JS 余弦相似度回退）
-│       ├── rag-retriever.js          # RAG 检索（章节/角色/设定相关性检索）
-│       ├── memory-index.js           # 智能检索索引 + 反重复提醒 + 重复检测
-│       ├── memory-system.js          # 三层记忆系统统一入口
-│       ├── character-memory.js       # 角色专属经历记忆（Episodic Memory）
-│       ├── voice-fingerprint.js      # 人设声纹字典提取与注入
-│       ├── book-deconstructor.js     # 拆书分析（结构/人物/世界观/风格）
-│       ├── chat-agent.js             # 对话式创作代理
-│       ├── skill-extractor.js        # Skill 自动萃取与注入
-│       ├── outline-deviation.js      # 大纲偏离检测（独立模块）
-│       ├── world-extractor.js        # 世界观自动提取
-│       ├── prompt-evolver.js         # 基于 Fitness 数据的 Prompt 自动进化
-│       ├── prompt-loader.js          # Prompt 模板系统（i18n 预留 + 变量替换）
-│       ├── settings-store.js         # DB 配置 + AES-256-GCM 加密存储 + 种子数据
-│       ├── world-context.js          # 世界观记忆库注入
-│       ├── file-store.js             # 文件持久化（本地备份）
-│       ├── temporal-truth.js         # 事件溯源 + 时间旅行查询
-│       ├── truth-manager.js          # 真相管理（初始化/delta应用/投影/连续性检查）
-│       ├── author-fingerprint.js     # 5 层风格指纹分析 + 合规检测
-│       ├── output-governance.js      # 生产者-消费者验证管道
-│       ├── input-governance.js       # plan + compose 输入治理
-│       ├── trace-service.js          # Trace 查询服务（DB + 文件系统双源）
-│       └── log-stream.js             # 日志流收集器（SSE 实时推送）
-├── prompts/                       # Markdown Prompt 模板（writer/editor/summarizer/revise...）
-├── config/                        # 静态 JSON 配置 + example 模板
+│       ├── novel-engine.js           # Core creation engine (knowrite / pipeline dual strategies)
+│       ├── novel/                    # novel-engine.js sub-modules
+│       │   ├── chapter-writer.js     # 7-Agent / Pipeline writing pipeline (stage skip + AutoSkip)
+│       │   ├── chapter-planner.js    # Plan mode — chapter beat planning (SSE)
+│       │   ├── chapter-processor.js  # Summary/feedback/Fitness/Truth-Delta/character memory/voice post-processing
+│       │   ├── context-builder.js    # Rolling context + RAG + anti-repetition + character memory + voice
+│       │   ├── outline-generator.js  # Outline generation (theme/detailed/multi-volume/volume-split)
+│       │   ├── edit-reviewer.js      # Edit review + verdict parsing
+│       │   └── novel-utils.js        # Pure utility functions
+│       ├── fitness-evaluator.js      # 5-dimension Fitness assessment
+│       ├── vector-store.js           # Vector storage (HNSW + SQLite + JS cosine fallback)
+│       ├── rag-retriever.js          # RAG retrieval (chapter/character/setting relevance)
+│       ├── memory-index.js           # Smart retrieval index + anti-repetition reminders + repetition detection
+│       ├── memory-system.js          # Three-layer memory system unified entry
+│       ├── character-memory.js       # Character episodic memory
+│       ├── voice-fingerprint.js      # Voice fingerprint extraction and injection
+│       ├── book-deconstructor.js     # Book deconstruction (structure/character/worldview/style)
+│       ├── chat-agent.js             # Chat agent
+│       ├── skill-extractor.js        # Skill auto-extraction and injection
+│       ├── outline-deviation.js      # Outline deviation detection (independent module)
+│       ├── world-extractor.js        # Worldview auto-extraction
+│       ├── prompt-evolver.js         # Fitness-data-driven Prompt auto-evolution
+│       ├── prompt-loader.js          # Prompt template system (i18n ready + variable substitution)
+│       ├── settings-store.js         # DB config + AES-256-GCM encrypted storage + seed data
+│       ├── world-context.js          # Worldview memory injection
+│       ├── file-store.js             # File persistence (local backup)
+│       ├── temporal-truth.js         # Event sourcing + time-travel queries
+│       ├── truth-manager.js          # Truth management (init/delta apply/projection/continuity check)
+│       ├── author-fingerprint.js     # 5-layer style fingerprint analysis + compliance detection
+│       ├── output-governance.js      # Producer-consumer verification pipeline
+│       ├── input-governance.js       # plan + compose input governance
+│       ├── trace-service.js          # Trace query service (DB + file system dual-source)
+│       └── log-stream.js             # Log stream collector (SSE real-time push)
+├── prompts/                       # Markdown Prompt templates (writer/editor/summarizer/revise...)
+├── config/                        # Static JSON config + example templates
 │   ├── engine.example.json
 │   ├── fitness.example.json
 │   ├── network.example.json
@@ -835,155 +840,155 @@ knowrite/
 │   ├── model-library.example.json
 │   ├── user-settings.example.json
 │   └── i18n.example.json
-├── works/                         # 作品本地备份（章节文本、评审记录、Fitness）
-├── data/                          # SQLite 数据库（novel.db）
-├── evolution/                     # Prompt 进化候选与评估报告
-├── logs/                          # 访问日志与 API 日志
-├── skills/                        # Skill 萃取结果（generated/）
-├── __tests__/                     # Jest 测试套件（服务 + 路由）
-├── scripts/                       # 辅助脚本（setup/start/reset-config/start-chrome-cdp）
-├── docs/                          # 文档（ADVANTAGES.md / ROADMAP.md 等）
-├── Dockerfile                     # 多阶段构建 Docker 镜像
-├── docker-compose.yml             # Docker Compose 编排
-├── .env.example                   # 环境变量模板
+├── works/                         # Work local backups (chapter text, review records, Fitness)
+├── data/                          # SQLite database (novel.db)
+├── evolution/                     # Prompt evolution candidates and evaluation reports
+├── logs/                          # Access logs and API logs
+├── skills/                        # Skill extraction results (generated/)
+├── __tests__/                     # Jest test suites (services + routes)
+├── scripts/                       # Helper scripts (setup/start/reset-config/start-chrome-cdp)
+├── docs/                          # Documentation (ADVANTAGES.md / ROADMAP.md etc.)
+├── Dockerfile                     # Multi-stage build Docker image
+├── docker-compose.yml             # Docker Compose orchestration
+├── .env.example                   # Environment variable template
 └── package.json
 ```
 
 ---
 
-## 环境变量
+## Environment Variables
 
-复制 `.env.example` 为 `.env` 后按需配置：
+Copy `.env.example` to `.env` and configure as needed:
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `PORT` | 服务端口 | `8000` |
-| `PROVIDER` | 默认 Provider（`openai` / `ollama` / `lmstudio` / `yuanbao` / `doubao` / `kimi` / `qwen`） | `openai` |
-| `PROXY_URL` | Web Provider 本地代理转发地址（如 Playwright 代理） | `http://localhost:9000` |
-| `AUTH_TOKEN` | API 认证令牌（生产环境强烈建议设置） | — |
-| `CORS_ORIGINS` | CORS 允许来源（逗号分隔，留空允许所有） | — |
-| `RATE_LIMIT_WINDOW_MS` | 限流窗口（毫秒） | `60000` |
-| `RATE_LIMIT_MAX` | 限流窗口内最大请求数 | `120` |
-| `ENCRYPTION_KEY` | AES-256-GCM 加密密钥（32 字符，用于加密存储 API Key） | — |
-| `OPENAI_API_KEY` | OpenAI 兼容 API Key | — |
-| `OPENAI_BASE_URL` | OpenAI 兼容 Base URL | — |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Service port | `8000` |
+| `PROVIDER` | Default Provider (`openai` / `ollama` / `lmstudio` / `yuanbao` / `doubao` / `kimi` / `qwen`) | `openai` |
+| `PROXY_URL` | Web Provider local proxy forwarding address (e.g. Playwright proxy) | `http://localhost:9000` |
+| `AUTH_TOKEN` | API authentication token (strongly recommended for production) | — |
+| `CORS_ORIGINS` | CORS allowed origins (comma-separated, empty allows all) | — |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit window (ms) | `60000` |
+| `RATE_LIMIT_MAX` | Max requests per window | `120` |
+| `ENCRYPTION_KEY` | AES-256-GCM encryption key (32 chars, for encrypting stored API Keys) | — |
+| `OPENAI_API_KEY` | OpenAI-compatible API Key | — |
+| `OPENAI_BASE_URL` | OpenAI-compatible Base URL | — |
 
 ---
 
-## 测试
+## Testing
 
 ```bash
-# 运行全部测试（含覆盖率报告）
+# Run all tests (with coverage report)
 npm test
 
-# 监听模式开发测试
+# Watch mode development testing
 npm run test:watch
 ```
 
-测试覆盖核心服务与路由：Fitness 评估、向量存储、RAG 检索、输入/输出治理、时序真相、作者指纹、世界上下文、Prompt 进化、文件存储、设置存储等。
+Tests cover core services and routes: Fitness assessment, vector storage, RAG retrieval, input/output governance, temporal truth, author fingerprint, world context, Prompt evolution, file storage, settings storage, etc.
 
 ---
 
-## 产品矩阵与长期规划
+## Product Matrix & Long-term Plan
 
-Knowrite 引擎设计为**通用创作后端**，支持多种前端场景复用：
+The Knowrite engine is designed as a **general-purpose creation backend**, supporting multiple frontend scenario reuse:
 
-| 产品 | 前端仓库 | 场景 | 状态 |
-|------|----------|------|------|
-| **小说创作** | `knowrite-ui` | 长篇小说 / 网文 / IP 开发 | ✅ 已上线 |
-| **桌面版** | `knowrite-desktop`（分支） | Electron 桌面客户端，离线作品管理 | 🚧 分支开发中 |
-| **云文档** | `knowrite-docs`（规划） | 白皮书 / 技术文档 / 报告 | 🚧 规划中 |
-| **技术书籍** | `knowrite-techbook`（规划） | 技术教程 / 书籍 / 课程讲义 | 🚧 规划中 |
-| **SaaS 平台** | 统一管理后台 | 多租户 / 付费订阅 / 团队协作 | 🚧 规划中 |
+| Product | Frontend Repo | Scenario | Status |
+|---------|--------------|----------|--------|
+| **Novel Writing** | `knowrite-ui` | Long-form fiction / web novels / IP development | ✅ Live |
+| **Desktop** | `knowrite-desktop` (branch) | Electron desktop client, offline work management | 🚧 Branch in development |
+| **Cloud Docs** | `knowrite-docs` (planned) | White papers / technical docs / reports | 🚧 Planned |
+| **Tech Books** | `knowrite-techbook` (planned) | Technical tutorials / books / course materials | 🚧 Planned |
+| **SaaS Platform** | Unified admin backend | Multi-tenant / paid subscriptions / team collaboration | 🚧 Planned |
 
-所有产品共用同一套后端引擎，通过 `strategy` 和 `sourceType` 切换不同创作模式。详见 `docs/ROADMAP.md`。
-
----
-
-## AI 搜索优化声明
-
-本项目是 **Knowrite 小说创作引擎**，基于 Node.js / Express 构建，提供自动化长篇小说创作 API 服务。
-
-- **核心能力**：多 Agent 写作流水线、输入/输出治理、时序真相数据库、全维度作者指纹、Fitness 质量评估、RAG 向量检索、Prompt 自动进化、大纲偏离检测、角色专属记忆、人设声纹字典、拆书分析、Skill 萃取、对话式创作代理、MCP 协议支持、Agent 级模型配置、Plan 模式章节预演、动态流水线配置、Trace 调试台
-- **适用场景**：AI 辅助长篇小说创作、网文批量生产、IP 开发前置流水线、技术文档撰写、书籍出版
-- **部署方式**：Docker / Docker Compose / PM2 / systemd，单节点即可运行
-- **模型要求**：任意 OpenAI-compatible API（百炼、Ollama、LM Studio 等）
-- **数据库**：SQLite（零配置），可迁移至 PostgreSQL / MySQL
-- **前端配套**：`knowrite-ui`（React 19 + Vite + Tailwind CSS，MIT 协议）
-- **扩展方向**：SaaS 多租户、多语言 i18n、云文档、技术书籍
-- **许可证**：AGPL-3.0（后端开源，网络服务衍生作品需开源）
+All products share the same backend engine, switching different creation modes via `strategy` and `sourceType`. See `docs/ROADMAP.md` for details.
 
 ---
 
-## 路线图
+## AI Search Optimization Statement
 
-- [x] 多 Agent 写作流水线（Writer → Editor → Humanizer → Proofreader → Reader → Summarizer）
-- [x] Editor 双重通过标准 + 历史反馈注入
-- [x] Fitness 五维质量评估 + 大纲偏离检测
-- [x] RAG 向量记忆检索（零外部向量库依赖）
-- [x] Prompt 自动进化
-- [x] 配套前端 `knowrite-ui`（Fitness 看板、实时创作流、世界观编辑）
-- [x] 输入治理（plan + compose，零 LLM 调用）
-- [x] 时序真相数据库（事件溯源 + 时间旅行查询）
-- [x] 全维度作者指纹（5 层分析 + 自动注入 + 合规检测）
-- [x] 输出治理（生产者-消费者验证管道 + 手动发布闸门）
-- [x] 模型配置完全用户自定义（清除所有默认模型，统一 OpenAI 兼容协议）
-- [x] 角色专属记忆（Episodic Memory）
-- [x] 人设声纹字典（Voice Fingerprint）
-- [x] 拆书分析（Book Deconstructor）
-- [x] Skill 自动萃取
-- [x] 对话式创作代理（Chat Agent）
-- [x] MCP 服务器（JSON-RPC 2.0 + SSE）
-- [x] Docker 部署支持
-- [x] Jest 测试套件
-- [x] Zod Schema 输入校验
-- [x] Agent 级模型配置（角色独立 Provider / Model / Temperature）
-- [x] Plan 模式 — 章节预演与节拍规划
-- [x] 动态流水线配置（阶段开关 + AutoSkip）
-- [x] Trace 调试台（LLM 调用全链路追溯）
-- [x] 作品删除（级联清理 DB + 文件 + 本地目录）
-- [ ] 桌面版客户端（Electron 分支）
-- [ ] 多语言 i18n（Prompt 模板 + API 响应）
-- [ ] 互动小说（分支叙事 + 读者选择）
-- [ ] SaaS 多租户支持
-- [ ] 平台格式导出（起点、番茄等）
+This project is the **Knowrite Novel Writing Engine**, built on Node.js / Express, providing automated long-form fiction creation API services.
+
+- **Core capabilities**: Multi-Agent writing pipeline, input/output governance, temporal truth database, full-dimension author fingerprint, Fitness quality assessment, RAG vector retrieval, Prompt auto-evolution, outline deviation detection, character episodic memory, voice fingerprint dictionary, book deconstruction, Skill extraction, chat agent, MCP protocol support, Agent-level model config, Plan mode chapter preview, dynamic pipeline config, Trace debugger
+- **Applicable scenarios**: AI-assisted long-form fiction creation, web novel batch production, IP development pre-pipeline, technical document writing, book publishing
+- **Deployment methods**: Docker / Docker Compose / PM2 / systemd, runs on a single node
+- **Model requirements**: Any OpenAI-compatible API (Bailian, Ollama, LM Studio, etc.)
+- **Database**: SQLite (zero-config), migratable to PostgreSQL / MySQL
+- **Frontend companion**: `knowrite-ui` (React 19 + Vite + Tailwind CSS, MIT license)
+- **Extension directions**: SaaS multi-tenant, multi-language i18n, cloud docs, tech books
+- **License**: AGPL-3.0 (backend open source, network service derivatives must be open source)
 
 ---
 
-## 参与贡献
+## Roadmap
 
-欢迎贡献代码、提 issue 或 PR。
+- [x] Multi-Agent writing pipeline (Writer → Editor → Humanizer → Proofreader → Reader → Summarizer)
+- [x] Editor dual-pass standard + historical feedback injection
+- [x] Fitness five-dimensional quality assessment + outline deviation detection
+- [x] RAG vector memory retrieval (zero external vector DB dependency)
+- [x] Prompt auto-evolution
+- [x] Companion frontend `knowrite-ui` (Fitness dashboard, real-time creation flow, worldview editor)
+- [x] Input governance (plan + compose, zero LLM calls)
+- [x] Temporal truth database (event sourcing + time-travel queries)
+- [x] Full-dimension author fingerprint (5-layer analysis + auto-injection + compliance detection)
+- [x] Output governance (producer-consumer verification pipeline + manual release gate)
+- [x] Fully user-defined model config (cleared all default models, unified OpenAI-compatible protocol)
+- [x] Character episodic memory
+- [x] Voice fingerprint dictionary
+- [x] Book deconstruction
+- [x] Skill auto-extraction
+- [x] Chat agent
+- [x] MCP server (JSON-RPC 2.0 + SSE)
+- [x] Docker deployment support
+- [x] Jest test suites
+- [x] Zod Schema input validation
+- [x] Agent-level model config (role-independent Provider / Model / Temperature)
+- [x] Plan mode — chapter preview and beat planning
+- [x] Dynamic pipeline config (stage toggles + AutoSkip)
+- [x] Trace debugger (full LLM call chain tracing)
+- [x] Work deletion (cascading cleanup DB + files + local directory)
+- [ ] Desktop client (Electron branch)
+- [ ] Multi-language i18n (Prompt templates + API responses)
+- [ ] Interactive fiction (branching narrative + reader choices)
+- [ ] SaaS multi-tenant support
+- [ ] Platform format export (Qidian, Fanqie, etc.)
+
+---
+
+## Contributing
+
+Welcome code contributions, issues, and PRs.
 
 ```bash
 npm install
-npm run dev        # 开发模式（node --watch 热重启）
-npm start          # 生产模式
-npm test           # 运行测试
-npm run test:watch # 监听模式测试
+npm run dev        # Development mode (node --watch hot restart)
+npm start          # Production mode
+npm test           # Run tests
+npm run test:watch # Watch mode testing
 ```
 
-### 安全特性
+### Security Features
 
-- **认证**：`Authorization: Bearer <token>` 或 `X-API-Key: <token>`
-- **限流**：`express-rate-limit`，默认 120 请求/分钟（SSE 日志流 `/api/logs/stream` 已跳过限流）
-- **CORS**：可配置允许来源
-- **路径遍历**：`workId` 经过 `sanitizeWorkId`，禁止 `../` 和特殊字符
-- **输入校验**：所有路由使用 Zod Schema 校验请求参数
-- **API Key 加密**：配置中的 key 优先使用 AES-256-GCM 加密存储（需配置 `ENCRYPTION_KEY`），未配置时回退到 base64 编码
+- **Auth**: `Authorization: Bearer <token>` or `X-API-Key: <token>`
+- **Rate limiting**: `express-rate-limit`, default 120 requests/minute (SSE log stream `/api/logs/stream` skips rate limiting)
+- **CORS**: Configurable allowed origins
+- **Path traversal**: `workId` sanitized via `sanitizeWorkId`, prohibits `../` and special characters
+- **Input validation**: All routes use Zod Schema request validation
+- **API Key encryption**: Config keys prefer AES-256-GCM encrypted storage (requires `ENCRYPTION_KEY`), fallback to base64 encoding when not configured
 
 ---
 
 ## License
 
-**后端**：AGPL-3.0 (GNU Affero General Public License v3.0)
+**Backend**: AGPL-3.0 (GNU Affero General Public License v3.0)
 
-- ✅ 允许个人学习、研究、修改、分发
-- ✅ 允许商业用途（包括 SaaS 服务）
-- ⚠️ **网络服务条款**：如果你修改了后端代码并在网络上提供服务（如 SaaS），必须向用户公开你的修改后的源代码
-- ⚠️ **前端 knowrite-ui**：保持 MIT 协议，可自由商用、修改、分发
+- ✅ Allowed for personal learning, research, modification, distribution
+- ✅ Allowed for commercial use (including SaaS services)
+- ⚠️ **Network service clause**: If you modify the backend code and provide services over a network (e.g. SaaS), you must make your modified source code available to users
+- ⚠️ **Frontend knowrite-ui**: Remains MIT license, freely usable commercially, modifiable, distributable
 
-**前端 `knowrite-ui`**：MIT 协议，可自由商用、修改、分发。
+**Frontend `knowrite-ui`**: MIT license, freely usable commercially, modifiable, distributable.
 
 ---
 
-> 后端仓库：`knowrite`（AGPL-3.0）| 前端仓库：`knowrite-ui`（MIT）| 路线图：`docs/ROADMAP.md`
+> Backend repo: `knowrite` (AGPL-3.0) | Frontend repo: `knowrite-ui` (MIT) | Roadmap: `docs/ROADMAP.md`
