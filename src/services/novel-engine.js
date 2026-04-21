@@ -312,7 +312,7 @@ async function deleteWork(workId) {
 
 // ============ Pipeline 单章流程（兼容旧版） ============
 
-async function startNovel(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate) {
+async function startNovel(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate, language) {
   const engineCfg = await getConfig('engine');
   const workId = await generateWorkId(topic, strategy);
   ensureDir(getWorkDir(workId));
@@ -329,6 +329,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
     authorStyle: authorStyle || '',
     strategy,
     writingMode: writingMode || null,
+    language: language || 'zh',
     outlineTheme: '',
     outlineDetailed: '',
     outlineMultivolume: '',
@@ -367,7 +368,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
   if (callbacks.onStepStart) callbacks.onStepStart({ key: 'outline_theme', name: '生成主题大纲', model: outlineModel });
   const outlineThemeResult = await outlineGenerator.generateOutline(topic, style, outlineModel, {
     onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk('outline_theme', chunk); }
-  }, workId);
+  }, workId, language);
   await writeFile(workId, 'outline_theme.txt', outlineThemeResult.content);
   if (callbacks.onStepEnd) callbacks.onStepEnd('outline_theme', outlineThemeResult);
 
@@ -375,7 +376,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
   if (callbacks.onStepStart) callbacks.onStepStart({ key: 'outline_detailed', name: '生成详细纲章', model: outlineModel });
   const outlineDetailedResult = await outlineGenerator.generateDetailedOutline(topic, style, outlineThemeResult.content, outlineModel, {
     onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk('outline_detailed', chunk); }
-  }, workId);
+  }, workId, language);
   await writeFile(workId, 'outline_detailed.txt', outlineDetailedResult.content);
   if (callbacks.onStepEnd) callbacks.onStepEnd('outline_detailed', outlineDetailedResult);
 
@@ -387,7 +388,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
     if (callbacks.onStepStart) callbacks.onStepStart({ key: 'outline_multivolume', name: '生成多卷大纲', model: outlineModel });
     const mvResult = await outlineGenerator.generateMultivolumeOutline(topic, style, outlineDetailedResult.content, 3, outlineModel, {
       onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk('outline_multivolume', chunk); }
-    }, workId);
+    }, workId, language);
     outlineMultivolume = mvResult.content;
     await writeFile(workId, 'outline_multivolume.txt', outlineMultivolume);
     if (callbacks.onStepEnd) callbacks.onStepEnd('outline_multivolume', mvResult);
@@ -399,7 +400,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
       if (callbacks.onStepStart) callbacks.onStepStart({ key: stepKey, name: `生成第${v}卷纲章`, model: outlineModel });
       const volResult = await outlineGenerator.generateVolumeOutline(topic, style, outlineMultivolume, v, outlineModel, {
         onChunk: (chunk) => { if (callbacks.onChunk) callbacks.onChunk(stepKey, chunk); }
-      }, workId);
+      }, workId, language);
       await writeFile(workId, `volume_${v}_outline.txt`, volResult.content);
       if (callbacks.onStepEnd) callbacks.onStepEnd(stepKey, volResult);
       volumes.push({
@@ -460,7 +461,7 @@ async function startNovel(topic, style, strategy, customModels, callbacks, platf
 
 // ============ 尝试创作（渐进式流程）============
 
-async function tryCreateOutline(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate) {
+async function tryCreateOutline(topic, style, strategy, customModels, callbacks, platformStyle, authorStyle, writingMode, storyTemplate, language) {
   const workId = await generateWorkId(topic, strategy);
   ensureDir(getWorkDir(workId));
 
@@ -475,6 +476,7 @@ async function tryCreateOutline(topic, style, strategy, customModels, callbacks,
     authorStyle: authorStyle || '',
     strategy,
     writingMode: writingMode || null,
+    language: language || 'zh',
     outlineTheme: '',
     outlineDetailed: '',
     outlineMultivolume: '',
@@ -508,7 +510,7 @@ async function tryCreateOutline(topic, style, strategy, customModels, callbacks,
     if (callbacks?.onStepStart) callbacks.onStepStart({ key: 'outline_theme', name: '生成主题大纲', model: outlineModel });
     const outlineThemeResult = await outlineGenerator.generateOutline(topic, style, outlineModel, {
       onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('outline_theme', chunk); }
-    }, workId);
+    }, workId, language);
     await writeFile(workId, 'outline_theme.txt', outlineThemeResult.content);
     if (callbacks?.onStepEnd) callbacks.onStepEnd('outline_theme', outlineThemeResult);
 
@@ -532,11 +534,12 @@ async function tryCreateDetailedOutline(workId, customModels, callbacks) {
 
   const outlineModel = customModels.outline;
   const { topic, style, outlineTheme } = meta;
+  const language = meta.language || 'zh';
 
   if (callbacks?.onStepStart) callbacks.onStepStart({ key: 'outline_detailed', name: '生成详细纲章', model: outlineModel });
   const outlineDetailedResult = await outlineGenerator.generateDetailedOutline(topic, style, outlineTheme, outlineModel, {
     onChunk: (chunk) => { if (callbacks?.onChunk) callbacks.onChunk('outline_detailed', chunk); }
-  }, workId);
+  }, workId, language);
   await writeFile(workId, 'outline_detailed.txt', outlineDetailedResult.content);
   if (callbacks?.onStepEnd) callbacks.onStepEnd('outline_detailed', outlineDetailedResult);
 
@@ -711,7 +714,7 @@ async function importOutline(title, outlineText, options = {}) {
 
   let outlineDetailed = outlineText;
   if (optimize) {
-    const result = await outlineGenerator.generateDetailedOutline(title, style || '', outlineText, undefined, {});
+    const result = await outlineGenerator.generateDetailedOutline(title, style || '', outlineText, undefined, {}, null, meta.language || 'zh');
     outlineDetailed = result.content;
   }
   await writeFile(workId, 'outline_detailed.txt', outlineDetailed);

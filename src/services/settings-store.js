@@ -201,9 +201,21 @@ async function initSettings() {
         const content = fs.readFileSync(path.join(PROMPTS_DIR, file), 'utf-8');
         await Prompt.create({ name, lang: 'zh', content });
       }
-      console.log(`[settings] 已导入 ${files.length} 个 prompt 到数据库`);
+      // 导入英文 prompts
+      const enDir = path.join(PROMPTS_DIR, 'en');
+      if (fs.existsSync(enDir)) {
+        const enFiles = fs.readdirSync(enDir).filter(f => f.endsWith('.md'));
+        for (const file of enFiles) {
+          const name = file.replace(/\.md$/, '');
+          const content = fs.readFileSync(path.join(enDir, file), 'utf-8');
+          await Prompt.create({ name, lang: 'en', content });
+        }
+        console.log(`[settings] Imported ${files.length} Chinese + ${enFiles.length} English prompts into database`);
+      } else {
+        console.log(`[settings] Imported ${files.length} prompts into database`);
+      }
     } catch (err) {
-      console.error('[settings] 导入 prompt 失败:', err.message);
+      console.error('[settings] Prompt import failed:', err.message);
     }
   }
 }

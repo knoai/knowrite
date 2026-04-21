@@ -1,0 +1,8 @@
+1. Hook: The first 200 words must contain conflict, suspense, or an anomalous event; the ending must leave a strong hook (unresolved mystery, an impending confrontation, or a meaningful line of dialogue).
+2. Suspense: Use information gaps to create tension. Before a twist is revealed, there must be 2–3 instances of foreshadowing; prohibit reversals without warning.
+3. Visual impact: All important scenes must engage at least two senses (sight + sound / touch / smell). Avoid overusing vague words like "very," "extremely," or "seemed."
+4. Emotional impact: Emotion must be conveyed through detail, not stated directly. Do not write "he was very sad / very angry"; use actions and micro-expressions to communicate emotion.
+5. Immersion: The protagonist must have a vulnerability (fear of the dark, fear of heights, fear of letting someone down), and dilemmas must land through private emotional stakes.
+6. Character flaw: The protagonist or a core supporting character must have a visible flaw that influences the plot direction of this chapter.
+7. Pacing: Climactic scenes use short paragraphs and fast pacing; transitional scenes must still plant foreshadowing or advance relationships—no flat exposition.
+8. Language: Vary sentence length. Avoid consecutive parallelisms and AI clichés ("not only that," "it cannot be denied," "from a certain perspective"). Dialogue must be colloquial and true to each character's identity.

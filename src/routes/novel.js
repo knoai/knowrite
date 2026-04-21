@@ -70,9 +70,9 @@ function sendError(stream, err, context = '') {
 }
 
 router.post('/start', validateBody(startSchema), async (req, res) => {
-  const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode } = req.body || {};
+  const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode, language } = req.body || {};
   if (!topic || (!style && (!platformStyle || !authorStyle))) {
-    return res.status(400).json({ error: '缺少 topic 或风格信息' });
+    return res.status(400).json({ error: 'Missing topic or style information' });
   }
   const stream = sse(res);
 
@@ -91,7 +91,7 @@ router.post('/start', validateBody(startSchema), async (req, res) => {
         stream.send({ type: 'done', meta });
         stream.end();
       },
-    }, platformStyle, authorStyle, writingMode, storyTemplate);
+    }, platformStyle, authorStyle, writingMode, storyTemplate, language);
   } catch (err) {
     sendError(stream, err, '/start');
   }
@@ -159,9 +159,9 @@ router.post('/plan', async (req, res) => {
 // ============ 尝试创作（渐进式流程）============
 
 router.post('/try/outline', async (req, res) => {
-  const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode, storyTemplate } = req.body || {};
+  const { topic, style, platformStyle, authorStyle, strategy, customModels, writingMode, storyTemplate, language } = req.body || {};
   if (!topic || (!style && (!platformStyle || !authorStyle))) {
-    return res.status(400).json({ error: '缺少 topic 或风格信息' });
+    return res.status(400).json({ error: 'Missing topic or style information' });
   }
   const stream = sse(res);
   try {
@@ -170,7 +170,7 @@ router.post('/try/outline', async (req, res) => {
       onChunk(stepKey, chunk) { stream.send({ type: 'chunk', step: stepKey, chunk }); },
       onStepEnd(stepKey, result) { stream.send({ type: 'stepEnd', step: stepKey, chars: result.chars, durationMs: result.durationMs }); },
       onDone(meta) { stream.send({ type: 'done', meta }); stream.end(); },
-    }, platformStyle, authorStyle, writingMode, storyTemplate);
+    }, platformStyle, authorStyle, writingMode, storyTemplate, language);
   } catch (err) {
     sendError(stream, err, '/try/outline');
   }

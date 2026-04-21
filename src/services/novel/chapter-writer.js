@@ -178,7 +178,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     previousContext,
     nextNumber,
     ...wordVars,
-  });
+  }, meta.language || 'zh');
   if (worldContext) writerPrompt += '\n\n【世界观上下文】\n' + worldContext;
 
   // Skill 注入：自动匹配历史高分 Skill
@@ -325,7 +325,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
         engineCfg.truncation.editDraftHeadRatio || 0.5
       ),
       editHistory,
-    });
+    }, meta.language || 'zh');
     if (worldContext) editorPrompt += '\n\n【世界观上下文】\n' + worldContext;
     const editResult = await runStreamChat(
       [{ role: 'user', content: editorPrompt }],
@@ -376,7 +376,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
         currentDraft,
         editContent: editResult.content,
         round,
-      });
+      }, meta.language || 'zh');
       const editedResult = await runStreamChat(
         [{ role: 'user', content: revisePrompt }],
         await resolveWriterModel(nextNumber, models.writer),
@@ -428,7 +428,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
     const humanizePrompt = await loadPrompt(await resolvePromptName('humanizer', workId), {
       style,
       content: lastEditedResult.content,
-    });
+    }, meta.language || 'zh');
     humanizedResult = await runStreamChat(
       [{ role: 'user', content: humanizePrompt }],
       await resolveRoleModelConfig('humanizer', models.humanizer),
@@ -460,7 +460,7 @@ async function writeChapterMultiAgent(workId, meta, nextNumber, models, callback
       });
     const proofPrompt = await loadPrompt('proofreader', {
       content: humanizedResult.content,
-    });
+    }, meta.language || 'zh');
     finalResult = await runStreamChat(
       [{ role: 'user', content: proofPrompt }],
       await resolveRoleModelConfig('proofreader', models.proofreader),
@@ -682,7 +682,7 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
     previousContext,
     nextNumber,
     ...wordVars,
-  });
+  }, meta.language || 'zh');
   if (worldContext) chapterPrompt += '\n\n【世界观上下文】\n' + worldContext;
 
   // 输入治理：注入治理变量
@@ -751,7 +751,7 @@ async function writeChapterPipeline(workId, meta, nextNumber, models, callbacks)
     const polishPrompt = await loadPrompt('polish', {
       style,
       content: chapterResult.content,
-    });
+    }, meta.language || 'zh');
     polishResult = await runStreamChat(
       [{ role: 'user', content: polishPrompt }],
       await resolveRoleModelConfig('polish', models.polish),

@@ -12,6 +12,7 @@ const startSchema = z.object({
   strategy: z.enum(['knowrite', 'pipeline']).optional().default('pipeline'),
   customModels: z.record(z.string()).optional().default({}),
   writingMode: z.enum(['industrial', 'free']).optional(),
+  language: z.enum(['zh', 'en']).optional().default('zh'),
 }).refine((data) => data.style || (data.platformStyle && data.authorStyle), {
   message: '必须提供 style，或同时提供 platformStyle 和 authorStyle',
   path: ['style'],

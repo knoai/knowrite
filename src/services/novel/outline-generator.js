@@ -33,9 +33,9 @@ async function getCurrentVolumeOutline(workId, meta) {
   return meta.outlineDetailed || '';
 }
 
-async function generateOutline(topic, style, model, callbacks, workId = null) {
+async function generateOutline(topic, style, model, callbacks, workId = null, language = 'zh') {
   const wordVars = await getChapterWordVariables();
-  let prompt = await loadPrompt('outline-theme', { topic, style: await expandStyle(style), ...wordVars });
+  let prompt = await loadPrompt('outline-theme', { topic, style: await expandStyle(style), ...wordVars }, language);
   if (workId) {
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;
@@ -43,9 +43,9 @@ async function generateOutline(topic, style, model, callbacks, workId = null) {
   return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {}, workId ? { workId, agentType: 'outline', promptTemplate: 'outline-theme.md' } : undefined);
 }
 
-async function generateDetailedOutline(topic, style, outlineTheme, model, callbacks, workId = null) {
+async function generateDetailedOutline(topic, style, outlineTheme, model, callbacks, workId = null, language = 'zh') {
   const wordVars = await getChapterWordVariables();
-  let prompt = await loadPrompt('outline-detailed', { topic, style: await expandStyle(style), outlineTheme, ...wordVars });
+  let prompt = await loadPrompt('outline-detailed', { topic, style: await expandStyle(style), outlineTheme, ...wordVars }, language);
   if (workId) {
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;
@@ -53,7 +53,7 @@ async function generateDetailedOutline(topic, style, outlineTheme, model, callba
   return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {}, workId ? { workId, agentType: 'outline', promptTemplate: 'outline-detailed.md' } : undefined);
 }
 
-async function generateMultivolumeOutline(topic, style, outlineDetailed, totalVolumes, model, callbacks, workId = null) {
+async function generateMultivolumeOutline(topic, style, outlineDetailed, totalVolumes, model, callbacks, workId = null, language = 'zh') {
   const wordVars = await getChapterWordVariables();
   let prompt = await loadPrompt('outline-multivolume', {
     topic,
@@ -61,7 +61,7 @@ async function generateMultivolumeOutline(topic, style, outlineDetailed, totalVo
     outlineDetailed,
     totalVolumes,
     ...wordVars,
-  });
+  }, language);
   if (workId) {
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;
@@ -69,7 +69,7 @@ async function generateMultivolumeOutline(topic, style, outlineDetailed, totalVo
   return runStreamChat([{ role: 'user', content: prompt }], await resolveRoleModelConfig('outline', model), callbacks || {}, workId ? { workId, agentType: 'outline', promptTemplate: 'outline-multivolume.md' } : undefined);
 }
 
-async function generateVolumeOutline(topic, style, outlineMultivolume, volumeNumber, model, callbacks, workId = null) {
+async function generateVolumeOutline(topic, style, outlineMultivolume, volumeNumber, model, callbacks, workId = null, language = 'zh') {
   const wordVars = await getChapterWordVariables();
   let prompt = await loadPrompt('volume-outline', {
     topic,
@@ -77,7 +77,7 @@ async function generateVolumeOutline(topic, style, outlineMultivolume, volumeNum
     ...wordVars,
     outlineMultivolume,
     volumeNumber,
-  });
+  }, language);
   if (workId) {
     const worldCtx = await getWorldContextForPrompt(workId);
     if (worldCtx) prompt += '\n\n【世界观上下文】\n' + worldCtx;

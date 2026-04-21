@@ -27,6 +27,7 @@ const Work = sequelize.define('Work', {
   reviews: { type: DataTypes.JSON, defaultValue: {} },
   fitness: { type: DataTypes.JSON, defaultValue: {} },
   writingMode: { type: DataTypes.STRING, defaultValue: null },
+  language: { type: DataTypes.STRING, defaultValue: 'zh' },
 }, {
   tableName: 'works',
   timestamps: true,
