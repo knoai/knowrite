@@ -2,6 +2,8 @@ const axios = require('axios');
 const BaseProvider = require('../base-provider');
 const { getConfig } = require('../../services/settings-store');
 
+const DEFAULT_TIMEOUT = 30000;
+
 class OpenAIProvider extends BaseProvider {
   constructor(options = {}, name = 'openai') {
     super(name, options);

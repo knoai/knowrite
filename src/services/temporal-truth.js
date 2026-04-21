@@ -159,10 +159,17 @@ class TemporalTruthService {
       });
     }
 
+    // 过滤掉 subjectId 为空的事件，避免违反数据库 NOT NULL 约束
+    const validEvents = events.filter((event) => {
+      if (event.subjectId) return true;
+      console.warn(`[temporal-truth] 跳过 subjectId 为空的事件: type=${event.eventType}, chapter=${event.chapterNumber}`);
+      return false;
+    });
+
     // 批量事件在事务中创建，保证原子性
-    if (events.length > 0) {
+    if (validEvents.length > 0) {
       await sequelize.transaction(async (t) => {
-        for (const event of events) {
+        for (const event of validEvents) {
           await this.appendEvent(event, { transaction: t });
         }
       });

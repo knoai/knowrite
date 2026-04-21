@@ -40,7 +40,7 @@ async function saveIndex(workId, index) {
 /**
  * 让 AI 从章节摘要中提取实体、情节线、规则
  */
-async function extractIndexFromSummary(chapterNumber, summaryText, style, model, callbacks) {
+async function extractIndexFromSummary(workId, chapterNumber, summaryText, style, model, callbacks) {
   const prompt = `你是一位资深编辑，擅长从小说章节摘要中提取关键信息用于构建记忆索引。
 
 第${chapterNumber}章摘要：
@@ -85,7 +85,7 @@ ${summaryText}
  */
 async function appendChapterToIndex(workId, chapterNumber, summaryText, style, model, callbacks) {
   const index = await loadIndex(workId);
-  const extracted = await extractIndexFromSummary(chapterNumber, summaryText, style, model, callbacks);
+  const extracted = await extractIndexFromSummary(workId, chapterNumber, summaryText, style, model, callbacks);
 
   for (const key of ['entities', 'plot_threads', 'rules']) {
     if (!index[key]) index[key] = {};
