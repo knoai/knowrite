@@ -2,14 +2,16 @@
   "name": "knowrite",
   "version": "1.0.0",
   "description": "多模型 Agent 小说创作工作台，通过 proxy 服务调用 web provider",
-  "main": "src/index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "chat": "node examples/chat-cli.js",
-    "novel": "node examples/novel-cli.js",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
     "test": "jest --coverage",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit",
+    "chat": "node examples/chat-cli.js",
+    "novel": "node examples/novel-cli.js"
   },
   "keywords": [
     "agent",
@@ -26,6 +28,7 @@
     "dotenv": "^16.4.0",
     "express": "^4.18.0",
     "express-rate-limit": "^8.3.2",
+    "helmet": "^8.1.0",
     "hnswlib-node": "^3.0.0",
     "morgan": "^1.10.0",
     "sequelize": "^6.37.8",
@@ -33,9 +36,17 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^25.6.0",
     "axios-retry": "^4.5.0",
     "concurrently": "^9.2.1",
     "jest": "^30.3.0",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.9",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
   }
 }
