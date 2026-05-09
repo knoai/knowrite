@@ -18,6 +18,13 @@
 </p>
 
 ---
+## 🌐 Remote Experience
+No deployment required, experience online directly:
+
+| Service | Address |
+|---------|---------|
+| 🖥️ Online Demo | http://14.103.155.159:35175/ |
+
 
 AI Agents autonomously write novels — draft, review, revise, and evaluate, fully automated. A multi-agent collaborative engineering pipeline covering strict industrial-grade review and free creative modes, with built-in RAG vector memory, five-dimensional Fitness quality assessment, automatic Prompt evolution, book deconstruction, and Skill extraction.
 
